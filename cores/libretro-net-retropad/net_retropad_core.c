@@ -1,20 +1,3 @@
-/*  RetroArch - A frontend for libretro.
- *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
- *  Copyright (C) 2011-2015 - Daniel De Matteis
- *  Copyright (C) 2016 - Andrés Suárez
- * 
- *  RetroArch is free software: you can redistribute it and/or modify it under the terms
- *  of the GNU General Public License as published by the Free Software Found-
- *  ation, either version 3 of the License, or (at your option) any later version.
- *
- *  RetroArch is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
- *  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
- *  PURPOSE.  See the GNU General Public License for more details.
- 
- *  You should have received a copy of the GNU General Public License along with RetroArch.
- *  If not, see <http://www.gnu.org/licenses/>.
- */
-
 /*
  * To-do:
  * - Analog support
@@ -46,46 +29,61 @@
 #define SOCKET_ERROR -1
 #endif
 
+#ifdef RARCH_INTERNAL
+#include "internal_cores.h"
+#define NETRETROPAD_CORE_PREFIX(s) libretro_netretropad_##s
+#else
+#define NETRETROPAD_CORE_PREFIX(s) s
+#endif
+
 int s;
 int port;
 char message[64];
 char server[64];
 struct sockaddr_in si_other;
  
-struct retro_log_callback logger;
-retro_log_printf_t log_cb;
+static struct retro_log_callback logger;
+
+static retro_log_printf_t NETRETROPAD_CORE_PREFIX(log_cb);
+static retro_video_refresh_t NETRETROPAD_CORE_PREFIX(video_cb);
+static retro_audio_sample_t NETRETROPAD_CORE_PREFIX(audio_cb);
+static retro_audio_sample_batch_t NETRETROPAD_CORE_PREFIX(audio_batch_cb);
+static retro_environment_t NETRETROPAD_CORE_PREFIX(environ_cb);
+static retro_input_poll_t NETRETROPAD_CORE_PREFIX(input_poll_cb);
+static retro_input_state_t NETRETROPAD_CORE_PREFIX(input_state_cb);
+
 static uint16_t *frame_buf;
 
-int input_state = 0;
+static int NETRETROPAD_CORE_PREFIX(input_state) = 0;
 
-void retro_init(void)
+void NETRETROPAD_CORE_PREFIX(retro_init)(void)
 {
    frame_buf = (uint16_t*)calloc(320 * 240, sizeof(uint16_t));
 
-   log_cb(RETRO_LOG_INFO, "Initialising sockets...\n");
+   NETRETROPAD_CORE_PREFIX(log_cb)(RETRO_LOG_INFO, "Initialising sockets...\n");
    network_init();
 }
 
-void retro_deinit(void)
+void NETRETROPAD_CORE_PREFIX(retro_deinit)(void)
 {
    if (frame_buf)
       free(frame_buf);
    frame_buf = NULL;
 }
 
-unsigned retro_api_version(void)
+unsigned NETRETROPAD_CORE_PREFIX(retro_api_version)(void)
 {
    return RETRO_API_VERSION;
 }
 
-void retro_set_controller_port_device(
+void NETRETROPAD_CORE_PREFIX(retro_set_controller_port_device)(
       unsigned port, unsigned device)
 {
    (void)port;
    (void)device;
 }
 
-void retro_get_system_info(
+void NETRETROPAD_CORE_PREFIX(retro_get_system_info)(
       struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
@@ -95,7 +93,7 @@ void retro_get_system_info(
    info->valid_extensions = ""; /* Nothing. */
 }
 
-void retro_get_system_av_info(
+void NETRETROPAD_CORE_PREFIX(retro_get_system_av_info)(
       struct retro_system_av_info *info)
 {
    info->timing.fps = 60.0;
@@ -108,44 +106,39 @@ void retro_get_system_av_info(
    info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
-static retro_video_refresh_t video_cb;
-static retro_audio_sample_t audio_cb;
-static retro_audio_sample_batch_t audio_batch_cb;
-static retro_environment_t environ_cb;
-static retro_input_poll_t input_poll_cb;
-static retro_input_state_t input_state_cb;
 
-void update_input()
+static void retropad_update_input(void)
 {
-   input_state = 0;
-   input_poll_cb();
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B))
-      input_state += 1;
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A))
-      input_state += 2;
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT))
-      input_state += pow(2, 2);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START))
-      input_state += pow(2, 3);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
-      input_state += pow(2, 4);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
-      input_state += pow(2, 5);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
-      input_state += pow(2, 6);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
-      input_state += pow(2, 7);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y))
-      input_state += pow(2, 8);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X))
-      input_state += pow(2, 9);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L))
-      input_state += pow(2, 10);
-   if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R))
-      input_state += pow(2, 11);
+   unsigned value = 0;
+   NETRETROPAD_CORE_PREFIX(input_poll_cb)();
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B))
+      value += 1;
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A))
+      value += 2;
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT))
+      value += pow(2, 2);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START))
+      value += pow(2, 3);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP))
+      value += pow(2, 4);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN))
+      value += pow(2, 5);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT))
+      value += pow(2, 6);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT))
+      value += pow(2, 7);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y))
+      value += pow(2, 8);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X))
+      value += pow(2, 9);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L))
+      value += pow(2, 10);
+   if (NETRETROPAD_CORE_PREFIX(input_state_cb)(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R))
+      value += pow(2, 11);
+   NETRETROPAD_CORE_PREFIX(input_state) += value;
 }
 
-void retro_set_environment(retro_environment_t cb)
+void NETRETROPAD_CORE_PREFIX(retro_set_environment)(retro_environment_t cb)
 {
    static const struct retro_variable vars[] = {
       { "port", "Port; 55400|55401|55402|55403|55404|55405|55406|55407|55408|55409|55410|55411|55412|55413|55414|55415|55416|55417|55418|55419|55420" },
@@ -160,17 +153,17 @@ void retro_set_environment(retro_environment_t cb)
 
    enum retro_pixel_format fmt = RETRO_PIXEL_FORMAT_RGB565;
 
-   environ_cb = cb;
+   NETRETROPAD_CORE_PREFIX(environ_cb) = cb;
    bool no_content = true;
    cb(RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME, &no_content);
 
-   environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
+   NETRETROPAD_CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt);
 
    if (cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &logger))
-      log_cb = logger.log;
+      NETRETROPAD_CORE_PREFIX(log_cb) = logger.log;
 }
 
-static void check_variables(void)
+static void netretropad_check_variables(void)
 {
    struct retro_variable var, var2, var3, var4, port_var;
    var.key      = "ip_octet1";
@@ -179,65 +172,65 @@ static void check_variables(void)
    var4.key     = "ip_octet4";
    port_var.key = "port";
 
-   environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var);
-   environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var2);
-   environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var3);
-   environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var4);
-   environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &port_var);
+   NETRETROPAD_CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_GET_VARIABLE, &var);
+   NETRETROPAD_CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_GET_VARIABLE, &var2);
+   NETRETROPAD_CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_GET_VARIABLE, &var3);
+   NETRETROPAD_CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_GET_VARIABLE, &var4);
+   NETRETROPAD_CORE_PREFIX(environ_cb)(RETRO_ENVIRONMENT_GET_VARIABLE, &port_var);
 
    snprintf(server, sizeof(server), "%s.%s.%s.%s", var.value, var2.value, var3.value, var4.value);
    port = atoi(port_var.value);
 }
 
-void retro_set_audio_sample(retro_audio_sample_t cb)
+void NETRETROPAD_CORE_PREFIX(retro_set_audio_sample)(retro_audio_sample_t cb)
 {
-   audio_cb = cb;
+   NETRETROPAD_CORE_PREFIX(audio_cb) = cb;
 }
 
-void retro_set_audio_sample_batch(
+void NETRETROPAD_CORE_PREFIX(retro_set_audio_sample_batch)(
       retro_audio_sample_batch_t cb)
 {
-   audio_batch_cb = cb;
+   NETRETROPAD_CORE_PREFIX(audio_batch_cb) = cb;
 }
 
-void retro_set_input_poll(retro_input_poll_t cb)
+void NETRETROPAD_CORE_PREFIX(retro_set_input_poll)(retro_input_poll_t cb)
 {
-   input_poll_cb = cb;
+   NETRETROPAD_CORE_PREFIX(input_poll_cb) = cb;
 }
 
-void retro_set_input_state(retro_input_state_t cb)
+void NETRETROPAD_CORE_PREFIX(retro_set_input_state)(retro_input_state_t cb)
 {
-   input_state_cb = cb;
+   NETRETROPAD_CORE_PREFIX(input_state_cb) = cb;
 }
 
-void retro_set_video_refresh(retro_video_refresh_t cb)
+void NETRETROPAD_CORE_PREFIX(retro_set_video_refresh)(retro_video_refresh_t cb)
 {
-   video_cb = cb;
+   NETRETROPAD_CORE_PREFIX(video_cb) = cb;
 }
 
-void retro_reset(void)
+void NETRETROPAD_CORE_PREFIX(retro_reset)(void)
 {}
 
-void retro_run(void)
+void NETRETROPAD_CORE_PREFIX(retro_run)(void)
 {
    unsigned i;
-   update_input();
-   snprintf(message, sizeof(message), "%d", input_state);
+   retropad_update_input();
+   snprintf(message, sizeof(message), "%d", NETRETROPAD_CORE_PREFIX(input_state));
 
    /* send the message */
    if (sendto(s, message, strlen(message) , 0 , (struct sockaddr *) &si_other, sizeof(si_other))==-1)
-       log_cb(RETRO_LOG_INFO, "Error sending data\n");
+       NETRETROPAD_CORE_PREFIX(log_cb)(RETRO_LOG_INFO, "Error sending data\n");
 
    for (i = 0; i < 320 * 240; i++)
       frame_buf[i] = 4 << 5;
-   video_cb(frame_buf, 320, 240, 640);
+   NETRETROPAD_CORE_PREFIX(video_cb)(frame_buf, 320, 240, 640);
 }
 
-bool retro_load_game(const struct retro_game_info *info)
+bool NETRETROPAD_CORE_PREFIX(retro_load_game)(const struct retro_game_info *info)
 {
    socket_target_t in_target;
 
-   check_variables();
+   netretropad_check_variables();
 
    s = socket_create(
          "retropad",
@@ -246,7 +239,7 @@ bool retro_load_game(const struct retro_game_info *info)
          SOCKET_PROTOCOL_UDP);
 
    if (s == SOCKET_ERROR)
-      log_cb(RETRO_LOG_INFO, "socket failed");
+      NETRETROPAD_CORE_PREFIX(log_cb)(RETRO_LOG_INFO, "socket failed");
 
    /* setup address structure */
    memset((char *) &si_other, 0, sizeof(si_other));
@@ -257,20 +250,20 @@ bool retro_load_game(const struct retro_game_info *info)
 
    socket_set_target(&si_other, &in_target); 
 
-   log_cb(RETRO_LOG_INFO, "Server IP Address: %s\n" , server);
+   NETRETROPAD_CORE_PREFIX(log_cb)(RETRO_LOG_INFO, "Server IP Address: %s\n" , server);
 
    return true;
 }
 
-void retro_unload_game(void)
+void NETRETROPAD_CORE_PREFIX(retro_unload_game)(void)
 {}
 
-unsigned retro_get_region(void)
+unsigned NETRETROPAD_CORE_PREFIX(retro_get_region)(void)
 {
    return RETRO_REGION_NTSC;
 }
 
-bool retro_load_game_special(unsigned type,
+bool NETRETROPAD_CORE_PREFIX(retro_load_game_special)(unsigned type,
       const struct retro_game_info *info, size_t num)
 {
    (void)type;
@@ -279,19 +272,19 @@ bool retro_load_game_special(unsigned type,
    return false;
 }
 
-size_t retro_serialize_size(void)
+size_t NETRETROPAD_CORE_PREFIX(retro_serialize_size)(void)
 {
    return 0;
 }
 
-bool retro_serialize(void *data, size_t size)
+bool NETRETROPAD_CORE_PREFIX(retro_serialize)(void *data, size_t size)
 {
    (void)data;
    (void)size;
    return false;
 }
 
-bool retro_unserialize(const void *data,
+bool NETRETROPAD_CORE_PREFIX(retro_unserialize)(const void *data,
       size_t size)
 {
    (void)data;
@@ -299,22 +292,22 @@ bool retro_unserialize(const void *data,
    return false;
 }
 
-void *retro_get_memory_data(unsigned id)
+void *NETRETROPAD_CORE_PREFIX(retro_get_memory_data)(unsigned id)
 {
    (void)id;
    return NULL;
 }
 
-size_t retro_get_memory_size(unsigned id)
+size_t NETRETROPAD_CORE_PREFIX(retro_get_memory_size)(unsigned id)
 {
    (void)id;
    return 0;
 }
 
-void retro_cheat_reset(void)
+void NETRETROPAD_CORE_PREFIX(retro_cheat_reset)(void)
 {}
 
-void retro_cheat_set(unsigned idx,
+void NETRETROPAD_CORE_PREFIX(retro_cheat_set)(unsigned idx,
       bool enabled, const char *code)
 {
    (void)idx;

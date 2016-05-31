@@ -788,10 +788,8 @@ THREAD
 #elif defined(HAVE_THREADS)
 #include "../libretro-common/rthreads/rthreads.c"
 #include "../libretro-common/rthreads/rsemaphore.c"
-#include "../libretro-common/rthreads/async_job.c"
 #include "../gfx/video_thread_wrapper.c"
 #include "../audio/audio_thread_wrapper.c"
-#include "../autosave.c"
 #endif
 
 
@@ -915,8 +913,12 @@ MENU
 #endif
 
 #ifdef HAVE_NUKLEAR
-#include "../menu/drivers/nk_common.c"
-#include "../menu/drivers/nk_menu.c"
+#include "../menu/drivers/nuklear/nk_common.c"
+#include "../menu/drivers/nuklear/nk_menu.c"
+#include "../menu/drivers/nuklear/nk_wnd_shader_parameters.c"
+#include "../menu/drivers/nuklear/nk_wnd_file_picker.c"
+#include "../menu/drivers/nuklear/nk_wnd_settings.c"
+#include "../menu/drivers/nuklear/nk_wnd_main.c"
 #include "../menu/drivers/nuklear.c"
 #endif
 
@@ -928,6 +930,7 @@ MENU
 
 #ifdef HAVE_NETWORK_GAMEPAD
 #include "../input/input_remote.c"
+#include "../cores/libretro-net-retropad/net_retropad_core.c"
 #endif
 
 #include "../command.c"

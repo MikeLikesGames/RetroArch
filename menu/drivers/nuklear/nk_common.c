@@ -15,6 +15,8 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+ /*  This file is intended for backend code. */
+
 #include <streams/file_stream.h>
 
 #define NK_INCLUDE_FIXED_TYPES
@@ -27,11 +29,11 @@
 
 #include "nk_common.h"
 
-#include "../menu_display.h"
-#include "../../gfx/video_shader_driver.h"
+#include "../../menu_display.h"
+#include "../../../gfx/video_shader_driver.h"
 
-#include "../../gfx/drivers/gl_shaders/pipeline_zahnrad.glsl.vert.h"
-#include "../../gfx/drivers/gl_shaders/pipeline_zahnrad.glsl.frag.h"
+#include "../../../gfx/drivers/gl_shaders/pipeline_nuklear.glsl.vert.h"
+#include "../../../gfx/drivers/gl_shaders/pipeline_nuklear.glsl.frag.h"
 
 struct nk_font *font;
 struct nk_font_atlas atlas;
@@ -44,7 +46,9 @@ struct nk_image nk_common_image_load(const char *filename)
     int x,y,n;
     GLuint tex;
     unsigned char *data = stbi_load(filename, &x, &y, &n, 0);
-    if (!data) printf("Failed to load image: %s\n", filename);
+
+    if (!data)
+       printf("Failed to load image: %s\n", filename);
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
     glGenTextures(1, &tex);
@@ -69,7 +73,7 @@ char* nk_common_file_load(const char* path, size_t* size)
    return (char*)buf;
 }
 
-NK_API void nk_common_device_init(struct nk_device *dev)
+void nk_common_device_init(struct nk_device *dev)
 {
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
    GLint status;
@@ -77,8 +81,8 @@ NK_API void nk_common_device_init(struct nk_device *dev)
    dev->prog      = glCreateProgram();
    dev->vert_shdr = glCreateShader(GL_VERTEX_SHADER);
    dev->frag_shdr = glCreateShader(GL_FRAGMENT_SHADER);
-   glShaderSource(dev->vert_shdr, 1, &zahnrad_vertex_shader, 0);
-   glShaderSource(dev->frag_shdr, 1, &zahnrad_fragment_shader, 0);
+   glShaderSource(dev->vert_shdr, 1, &nuklear_vertex_shader, 0);
+   glShaderSource(dev->frag_shdr, 1, &nuklear_fragment_shader, 0);
    glCompileShader(dev->vert_shdr);
    glCompileShader(dev->frag_shdr);
    glGetShaderiv(dev->vert_shdr, GL_COMPILE_STATUS, &status);
@@ -217,7 +221,9 @@ void nk_common_device_draw(struct nk_device *dev,
    config.shape_AA             = AA;
    config.line_AA              = AA;
    config.circle_segment_count = 22;
-   //config.line_thickness       = 1.0f;
+#if 0
+   config.line_thickness       = 1.0f;
+#endif
    config.null                 = dev->null;
 
    /* setup buffers to load vertices and elements */
@@ -265,7 +271,6 @@ void nk_common_device_draw(struct nk_device *dev,
    menu_display_blend_end();
 }
 
-//void nk_mem_alloc(nk_handle a, void *old, nk_size b);
 void* nk_common_mem_alloc(nk_handle a, void *old, nk_size b)
 {
    (void)a;

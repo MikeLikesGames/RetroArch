@@ -514,7 +514,7 @@ bool win32_browser(
    ofn.lpstrInitialDir = TEXT(initial_dir);
    ofn.lpstrDefExt     = "";
    ofn.nMaxFile        = PATH_MAX;
-   ofn.Flags           = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+   ofn.Flags           = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
 
    if (!GetOpenFileName(&ofn))
       return false;
@@ -577,7 +577,7 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam)
                      runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH, win32_file);
 
                      do_wm_close = true;
-                     rarch_task_push_content_load_default(
+                     task_push_content_load_default(
                            NULL, NULL,
                            &content_info,
                            CORE_TYPE_PLAIN,

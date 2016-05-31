@@ -15,9 +15,14 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*  This file is intended for helper functions, custom controls, etc. */
+
+#ifndef _NK_MENU_H
+#define _NK_MENU_H
+
 #include "nk_common.h"
-#include "../menu_display.h"
-#include "../menu_input.h"
+#include "../../menu_display.h"
+#include "../../menu_input.h"
 
 enum
 {
@@ -27,9 +32,11 @@ enum
 
 enum
 {
-   ZRMENU_WND_MAIN = 0,
-   ZRMENU_WND_SHADER_PARAMETERS,
-   ZRMENU_WND_TEST,
+   NK_WND_MAIN = 0,
+   NK_WND_SETTINGS,
+   NK_WND_FILE_PICKER,
+   NK_WND_SHADER_PARAMETERS,
+   NK_WND_LAST
 };
 
 enum nk_menu_theme
@@ -57,7 +64,7 @@ struct window {
 
 typedef struct nk_menu_handle
 {
-   /* zahnrad mandatory */
+   /* nuklear mandatory */
    void *memory;
    struct nk_context ctx;
    struct nk_memory_status status;
@@ -83,10 +90,16 @@ typedef struct nk_menu_handle
       menu_texture_item list[NK_TEXTURE_LAST];
    } textures;
 
-   gfx_font_raster_block_t list_block;
+   video_font_raster_block_t list_block;
 } nk_menu_handle_t;
 
-void nk_menu_wnd_shader_parameters(nk_menu_handle_t *zr);
-void nk_menu_wnd_test(nk_menu_handle_t *zr);
-void nk_menu_wnd_main(nk_menu_handle_t *zr);
+void nk_wnd_shader_parameters(nk_menu_handle_t *zr);
+void nk_wnd_main(nk_menu_handle_t *zr);
+void nk_wnd_file_picker(nk_menu_handle_t *zr);
+void nk_wnd_settings(nk_menu_handle_t *zr);
+void nk_wnd_set_state(nk_menu_handle_t *zr, const int id,
+   struct nk_vec2 pos, struct nk_vec2 size);
+void nk_wnd_get_state(nk_menu_handle_t *zr, const int id,
+   struct nk_vec2 *pos, struct nk_vec2 *size);
 
+#endif

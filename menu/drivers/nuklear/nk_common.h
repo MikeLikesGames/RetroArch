@@ -15,6 +15,11 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef _NK_COMMON_H
+#define _NK_COMMON_H
+
+ /*  This file is intended for backend code. */
+
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
 #define NK_INCLUDE_DEFAULT_ALLOCATOR
@@ -22,11 +27,12 @@
 #define NK_INCLUDE_FONT_BAKING
 #define NK_INCLUDE_DEFAULT_FONT
 
-#include "../../deps/zahnrad/nuklear.h"
-#include "../../deps/stb/stb_image.h"
+#include <string.h>
+#include "../../../deps/nuklear/nuklear.h"
+#include "../../../deps/stb/stb_image.h"
 
 #if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES)
-#include "../../gfx/common/gl_common.h"
+#include "../../../gfx/common/gl_common.h"
 #endif
 
 #define MAX_VERTEX_MEMORY     (512 * 1024)
@@ -77,3 +83,5 @@ void* nk_common_mem_alloc(nk_handle a, void *old, nk_size b);
 void nk_common_mem_free(nk_handle unused, void *ptr);
 
 void device_upload_atlas(struct nk_device *dev, const void *image, int width, int height);
+
+#endif

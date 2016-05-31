@@ -26,9 +26,6 @@
 #include <boolean.h>
 #include <string/stdstring.h>
 #include <lists/string_list.h>
-#ifdef HAVE_THREADS
-#include <rthreads/async_job.h>
-#endif
 
 #ifdef _WIN32
 #ifdef _XBOX
@@ -109,15 +106,13 @@ enum
    RA_OPT_MAX_FRAMES
 };
 
+static bool current_core_explicitly_set = false;
 static enum rarch_core_type current_core_type;
+static enum rarch_core_type explicit_current_core_type;
 static char current_savefile_dir[PATH_MAX_LENGTH];
 
 static char error_string[PATH_MAX_LENGTH];
 static jmp_buf error_sjlj_context;
-
-#ifdef HAVE_THREADS
-static async_job_t *async_jobs;
-#endif
 
 #define _PSUPP(var, name, desc) printf("  %s:\n\t\t%s: %s\n", name, desc, _##var##_supp ? "yes" : "no")
 
@@ -177,13 +172,6 @@ static void retroarch_print_features(void)
    _PSUPP(v4l2, "Video4Linux2", "Camera driver");
 }
 #undef _PSUPP
-
-#ifdef HAVE_THREADS
-int retroarch_async_job_add(async_task_t task, void *payload)
-{
-   return async_job_add(async_jobs, task, payload);
-}
-#endif
 
 static void retroarch_print_version(void)
 {
@@ -397,27 +385,21 @@ static void retroarch_set_special_paths(char **argv, unsigned num_content)
    /* If this is already set,
     * do not overwrite it as this was initialized before in
     * a menu or otherwise. */
-   if (!string_is_empty(settings->directory.system))
-      return;
-
-   RARCH_WARN("SYSTEM DIR is empty, assume CONTENT DIR %s\n",argv[0]);
+   if (string_is_empty(settings->directory.system))
+   {
+      RARCH_WARN("SYSTEM DIR is empty, assume CONTENT DIR %s\n",argv[0]);
+   }
 }
 
 const char *retroarch_get_current_savefile_dir(void)
 {
-   char* ret        = NULL;
-   
-   if (!string_is_empty(current_savefile_dir))
-      ret = current_savefile_dir;
-   else
-   {
-      global_t *global = global_get_ptr();
-      ret = strdup(global->name.base);
-      path_basedir(ret);
-   }
+   char *ret = current_savefile_dir;
 
-   RARCH_LOG("Environ SAVE_DIRECTORY: \"%s\".\n",
-         ret);
+   /* try to infer the path in case it's still empty by calling
+   set_paths_redirect */
+   if (string_is_empty(ret))
+      rarch_ctl(RARCH_CTL_SET_PATHS_REDIRECT, NULL);
+   RARCH_LOG("Environ SAVE_DIRECTORY: \"%s\".\n", ret);
 
    return ret;
 }
@@ -435,14 +417,14 @@ static void retroarch_set_paths_redirect(const char *path)
 
    if (!global)
    {
-    RARCH_WARN("retroarch_set_paths_redirect was sent a NULL \"global\" pointer.");
-    return;
+      RARCH_WARN("retroarch_set_paths_redirect was sent a NULL \"global\" pointer.");
+      return;
    }
 
    if (info->info.library_name &&
-            !string_is_empty(info->info.library_name))
-         global_library_name_hash =
-            msg_hash_calculate(info->info.library_name);
+         !string_is_empty(info->info.library_name))
+      global_library_name_hash =
+         msg_hash_calculate(info->info.library_name);
 
    /* Initialize current save directories
     * with the values from the config. */
@@ -515,6 +497,15 @@ static void retroarch_set_paths_redirect(const char *path)
             }
          }
       }
+   }
+
+   /* Set savefile directory if empty based on content directory */
+   if (string_is_empty(current_savefile_dir))
+   {
+      global_t *global = global_get_ptr();
+      strlcpy(current_savefile_dir, global->name.base,
+            sizeof(current_savefile_dir));
+      path_basedir(current_savefile_dir);
    }
 
    if(path_is_directory(current_savefile_dir))
@@ -700,7 +691,8 @@ static void retroarch_parse_input(int argc, char *argv[])
     * bogus arguments.
     */
 
-   current_core_type                     = CORE_TYPE_DUMMY;
+   retroarch_set_current_core_type(CORE_TYPE_DUMMY, false);
+
    *global->subsystem                    = '\0';
    global->has_set.save_path             = false;
    global->has_set.state_path            = false;
@@ -802,9 +794,7 @@ static void retroarch_parse_input(int argc, char *argv[])
 
          case 'v':
             {
-               bool *verbosity = retro_main_verbosity();
-               if (verbosity)
-                  *verbosity = true;
+               verbosity_enable();
                global->has_set.verbosity = true;
             }
             break;
@@ -856,7 +846,7 @@ static void retroarch_parse_input(int argc, char *argv[])
                global->has_set.libretro = true;
 
                /* We requested explicit core, so use PLAIN core type. */
-               current_core_type = CORE_TYPE_PLAIN;
+               retroarch_set_current_core_type(CORE_TYPE_PLAIN, false);
             }
             else
             {
@@ -1053,20 +1043,20 @@ static void retroarch_parse_input(int argc, char *argv[])
       {
          /* Allow stray -L arguments to go through to workaround cases where it's used as "config file".
           * This seems to still be the case for Android, which should be properly fixed. */
-         current_core_type = CORE_TYPE_DUMMY;
+         retroarch_set_current_core_type(CORE_TYPE_DUMMY, false);
       }
    }
 
    if (!*global->subsystem && optind < argc)
    {
       /* We requested explicit ROM, so use PLAIN core type. */
-      current_core_type = CORE_TYPE_PLAIN;
+      retroarch_set_current_core_type(CORE_TYPE_PLAIN, false);
       retroarch_set_pathnames((const char*)argv[optind]);
    }
    else if (*global->subsystem && optind < argc)
    {
       /* We requested explicit ROM, so use PLAIN core type. */
-      current_core_type = CORE_TYPE_PLAIN;
+      retroarch_set_current_core_type(CORE_TYPE_PLAIN, false);
       retroarch_set_special_paths(argv + optind, argc - optind);
    }
    else
@@ -1096,7 +1086,7 @@ static void retroarch_init_savefile_paths(void)
    global->savefiles = string_list_new();
    retro_assert(global->savefiles);
 
-   if (*global->subsystem)
+   if (system && *global->subsystem)
    {
       /* For subsystems, we know exactly which RAM types are supported. */
 
@@ -1187,13 +1177,13 @@ static bool retroarch_init_state(void)
 
 bool retroarch_validate_game_options(char *s, size_t len, bool mkdir)
 {
-   char core_path[PATH_MAX_LENGTH];
-   char config_directory[PATH_MAX_LENGTH];
-   const char *core_name       = NULL;
-   const char *game_name       = NULL;
-   global_t *global            = global_get_ptr();
-   settings_t *settings        = config_get_ptr();
-   rarch_system_info_t *system = NULL;
+   char core_path[PATH_MAX_LENGTH]        = {0};
+   char config_directory[PATH_MAX_LENGTH] = {0};
+   const char *core_name                  = NULL;
+   const char *game_name                  = NULL;
+   rarch_system_info_t *system            = NULL;
+   global_t *global                       = global_get_ptr();
+   settings_t *settings                   = config_get_ptr();
 
    runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
 
@@ -1271,8 +1261,6 @@ static void retroarch_validate_cpu_features(void)
  **/
 bool retroarch_main_init(int argc, char *argv[])
 {
-   bool *verbosity   = NULL;
-
    retroarch_init_state();
 
    if (setjmp(error_sjlj_context) > 0)
@@ -1285,15 +1273,13 @@ bool retroarch_main_init(int argc, char *argv[])
    retro_main_log_file_init(NULL);
    retroarch_parse_input(argc, argv);
 
-   verbosity = retro_main_verbosity();
-
-   if (verbosity && *verbosity)
+   if (verbosity_is_enabled())
    {
       char str[PATH_MAX_LENGTH] = {0};
 
-      RARCH_LOG_OUTPUT("=== Build =======================================");
+      RARCH_LOG_OUTPUT("=== Build =======================================\n");
       retroarch_get_capabilities(RARCH_CAPABILITIES_CPU, str, sizeof(str));
-      fprintf(stderr, "%s", str);
+      fprintf(stderr, "Capabilities: %s\n", str);
       fprintf(stderr, "Built: %s\n", __DATE__);
       RARCH_LOG_OUTPUT("Version: %s\n", PACKAGE_VERSION);
 #ifdef HAVE_GIT_VERSION
@@ -1314,41 +1300,48 @@ bool retroarch_main_init(int argc, char *argv[])
             settings->multimedia.builtin_imageviewer_enable))
       {
          char *fullpath    = NULL;
-#if defined(HAVE_FFMPEG) || defined(HAVE_IMAGEVIEWER)
-         global_t *global  = global_get_ptr();
-#endif
 
-         runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath);
-
-         switch (retroarch_path_is_media_type(fullpath))
+         if (runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath))
          {
-            case RARCH_CONTENT_MOVIE:
-            case RARCH_CONTENT_MUSIC:
-               if (settings->multimedia.builtin_mediaplayer_enable)
-               {
+#if defined(HAVE_FFMPEG) || defined(HAVE_IMAGEVIEWER)
+            global_t *global  = global_get_ptr();
+#endif
+            switch (retroarch_path_is_media_type(fullpath))
+            {
+               case RARCH_CONTENT_MOVIE:
+               case RARCH_CONTENT_MUSIC:
+                  if (settings->multimedia.builtin_mediaplayer_enable)
+                  {
 #ifdef HAVE_FFMPEG
-                  global->has_set.libretro  = false;
-                  current_core_type         = CORE_TYPE_FFMPEG;
+                     global->has_set.libretro  = false;
+                     retroarch_set_current_core_type(CORE_TYPE_FFMPEG, false);
 #endif
-               }
-               break;
+                  }
+                  break;
 #ifdef HAVE_IMAGEVIEWER
-            case RARCH_CONTENT_IMAGE:
-               if (settings->multimedia.builtin_imageviewer_enable)
-               {
-                  global->has_set.libretro  = false;
-                  current_core_type         = CORE_TYPE_IMAGEVIEWER;
-               }
-               break;
+               case RARCH_CONTENT_IMAGE:
+                  if (settings->multimedia.builtin_imageviewer_enable)
+                  {
+                     global->has_set.libretro  = false;
+                     retroarch_set_current_core_type(CORE_TYPE_IMAGEVIEWER, false);
+                  }
+                  break;
 #endif
-            default:
-               break;
+               default:
+                  break;
+            }
          }
       }
    }
-
+   
    driver_ctl(RARCH_DRIVER_CTL_INIT_PRE, NULL);
-   if (!command_event(CMD_EVENT_CORE_INIT, &current_core_type))
+   if (current_core_explicitly_set)
+   {
+      current_core_explicitly_set = false;
+      if (!command_event(CMD_EVENT_CORE_INIT, &explicit_current_core_type))
+         goto error;
+   }
+   else if (!command_event(CMD_EVENT_CORE_INIT, &current_core_type))
       goto error;
 
    driver_ctl(RARCH_DRIVER_CTL_INIT_ALL, NULL);
@@ -1428,10 +1421,10 @@ bool rarch_ctl(enum rarch_ctl_state state, void *data)
          driver_ctl(RARCH_DRIVER_CTL_UNINIT_ALL, NULL);
          break;
       case RARCH_CTL_PREINIT:
-         if (!config_realloc())
-            return false;
 
          command_event(CMD_EVENT_HISTORY_DEINIT, NULL);
+
+         config_init();
 
          runloop_ctl(RUNLOOP_CTL_CLEAR_STATE, NULL);
          break;
@@ -1458,10 +1451,6 @@ bool rarch_ctl(enum rarch_ctl_state state, void *data)
          command_event(CMD_EVENT_SAVEFILES_DEINIT, NULL);
 
          rarch_ctl(RARCH_CTL_UNSET_INITED, NULL);
-#ifdef HAVE_THREADS
-         async_job_free(async_jobs);
-         async_jobs = NULL;
-#endif
          break;
       case RARCH_CTL_INIT:
          rarch_ctl(RARCH_CTL_DEINIT, NULL);
@@ -1472,9 +1461,6 @@ bool rarch_ctl(enum rarch_ctl_state state, void *data)
                settings->input.libretro_device[i] = RETRO_DEVICE_JOYPAD;
          }
          runloop_ctl(RUNLOOP_CTL_MSG_QUEUE_INIT, NULL);
-#ifdef HAVE_THREADS
-         async_jobs = async_job_new();
-#endif
          break;
       case RARCH_CTL_SET_PATHS_REDIRECT:
          if(settings->sort_savestates_enable || settings->sort_savefiles_enable)
@@ -1535,43 +1521,6 @@ bool rarch_ctl(enum rarch_ctl_state state, void *data)
       default:
          return false;
    }
-
-   return true;
-}
-
-/* Replaces currently loaded configuration file with
- * another one. Will load a dummy core to flush state
- * properly. */
-bool retroarch_replace_config(char *path)
-{
-   content_ctx_info_t content_info = {0};
-   settings_t *settings = config_get_ptr();
-   global_t     *global = global_get_ptr();
-
-   if (!path)
-      return false;
-
-   /* If config file to be replaced is the same as the
-    * current config file, exit. */
-   if (string_is_equal(path, global->path.config))
-      return false;
-
-   if (settings->config_save_on_exit && *global->path.config)
-      config_save_file(global->path.config);
-
-   strlcpy(global->path.config, path, sizeof(global->path.config));
-
-   rarch_ctl(RARCH_CTL_UNSET_BLOCK_CONFIG_READ, NULL);
-
-   *settings->path.libretro = '\0'; /* Load core in new config. */
-
-   if (!rarch_task_push_content_load_default(
-         NULL, NULL,
-         &content_info,
-         CORE_TYPE_DUMMY,
-         CONTENT_MODE_LOAD_NOTHING_WITH_DUMMY_CORE,
-         NULL, NULL))
-      return false;
 
    return true;
 }
@@ -1691,6 +1640,17 @@ int retroarch_get_capabilities(enum rarch_capabilities type,
    }
 
    return 0;
+}
+
+void retroarch_set_current_core_type(enum rarch_core_type type, bool explicitly_set)
+{
+   if (explicitly_set && !current_core_explicitly_set)
+   {
+      current_core_explicitly_set = true;
+      explicit_current_core_type  = type;
+   }
+   else
+      current_core_type          = type;
 }
 
 /**

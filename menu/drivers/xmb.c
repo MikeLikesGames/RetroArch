@@ -499,9 +499,9 @@ static void xmb_draw_icon(
    settings_t *settings = config_get_ptr();
 
    if (
-         x < -icon_size / 2 ||
+         x < (-icon_size / 2.0f) ||
          x > width ||
-         y < icon_size  / 2 ||
+         y < (icon_size  / 2.0f) ||
          y > height + icon_size)
       return;
 
@@ -735,7 +735,7 @@ static void xmb_update_thumbnail_image(void *data)
       return;
 
    if (path_file_exists(xmb->thumbnail_file_path))
-      rarch_task_push_image_load(xmb->thumbnail_file_path, "cb_menu_thumbnail",
+      task_push_image_load(xmb->thumbnail_file_path, "cb_menu_thumbnail",
             menu_display_handle_thumbnail_upload, NULL);
    else if (xmb->depth == 1)
       xmb->thumbnail = 0;
@@ -1071,7 +1071,7 @@ static void xmb_list_switch_new(xmb_handle_t *xmb,
        {
            if(path_file_exists(path))
            {
-              rarch_task_push_image_load(path, "cb_menu_wallpaper",
+              task_push_image_load(path, "cb_menu_wallpaper",
                   menu_display_handle_wallpaper_upload, NULL);
               strlcpy(xmb->background_file_path,
                     path, sizeof(xmb->background_file_path));
@@ -1423,7 +1423,7 @@ static void xmb_refresh_horizontal_list(xmb_handle_t *xmb)
 
    xmb_context_destroy_horizontal_list(xmb);
    if (xmb->horizontal_list)
-      free(xmb->horizontal_list);
+      file_list_free(xmb->horizontal_list);
    xmb->horizontal_list = NULL;
 
    menu_driver_ctl(RARCH_MENU_CTL_SET_PREVENT_POPULATE, NULL);
@@ -2283,13 +2283,12 @@ static void xmb_frame(void *data)
 
 static void xmb_font(xmb_handle_t *xmb)
 {
-   int font_size;
-   char mediapath[PATH_MAX_LENGTH],
-        themepath[PATH_MAX_LENGTH], fontpath[PATH_MAX_LENGTH];
    menu_display_ctx_font_t font_info;
-   settings_t *settings = config_get_ptr();
-
-   font_size = menu_display_get_font_size();
+   char mediapath[PATH_MAX_LENGTH] = {0};
+   char themepath[PATH_MAX_LENGTH] = {0};
+   char fontpath[PATH_MAX_LENGTH]  = {0};
+   settings_t            *settings = config_get_ptr();
+   int                   font_size = menu_display_get_font_size();
 
    fill_pathname_join(
          mediapath,
@@ -2586,7 +2585,7 @@ error:
          free(xmb->selection_buf_old);
       xmb->selection_buf_old = NULL;
       if (xmb->horizontal_list)
-         free(xmb->horizontal_list);
+         file_list_free(xmb->horizontal_list);
       xmb->horizontal_list = NULL;
    }
    return NULL;
@@ -2796,7 +2795,7 @@ static void xmb_context_reset_background(const char *iconpath)
       strlcpy(path, settings->path.menu_wallpaper, sizeof(path));
 
    if (path_file_exists(path))
-      rarch_task_push_image_load(path, "cb_menu_wallpaper",
+      task_push_image_load(path, "cb_menu_wallpaper",
             menu_display_handle_wallpaper_upload, NULL);
 }
 
@@ -3193,6 +3192,9 @@ static int xmb_list_push(void *data, void *userdata,
          }
 
          entry.info_label      = menu_hash_to_str(MENU_LABEL_START_CORE);
+         menu_displaylist_ctl(DISPLAYLIST_SETTING, &entry);
+
+         entry.info_label      = menu_hash_to_str(MENU_LABEL_START_NET_RETROPAD);
          menu_displaylist_ctl(DISPLAYLIST_SETTING, &entry);
 
 #ifndef HAVE_DYNAMIC

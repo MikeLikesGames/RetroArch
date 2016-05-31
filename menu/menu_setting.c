@@ -1065,22 +1065,23 @@ static void setting_get_string_representation_uint_libretro_device(void *data,
    unsigned index_offset;
    const struct retro_controller_description *desc = NULL;
    const char *name            = NULL;
+   rarch_system_info_t *system = NULL;
    rarch_setting_t *setting    = (rarch_setting_t*)data;
    settings_t      *settings   = config_get_ptr();
-   rarch_system_info_t *system = NULL;
-   
-   runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
 
    if (!setting)
       return;
 
    index_offset = menu_setting_get_index_offset(setting);
 
-   if (index_offset < system->ports.size)
-      desc = libretro_find_controller_description(
-            &system->ports.data[index_offset],
-            settings->input.libretro_device
-            [index_offset]);
+   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system))
+   {
+      if (index_offset < system->ports.size)
+         desc = libretro_find_controller_description(
+               &system->ports.data[index_offset],
+               settings->input.libretro_device
+               [index_offset]);
+   }
 
    if (desc)
       name = desc->desc;
@@ -2346,11 +2347,9 @@ static int setting_action_start_libretro_device_type(void *data)
    unsigned index_offset, current_device;
    unsigned devices[128], types = 0, port = 0;
    const struct retro_controller_info *desc = NULL;
-   rarch_setting_t   *setting  = (rarch_setting_t*)data;
-   settings_t        *settings = config_get_ptr();
    rarch_system_info_t *system = NULL;
-
-   runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
+   settings_t        *settings = config_get_ptr();
+   rarch_setting_t   *setting  = (rarch_setting_t*)data;
 
    if (setting_generic_action_start_default(setting) != 0)
       return -1;
@@ -2361,13 +2360,16 @@ static int setting_action_start_libretro_device_type(void *data)
    devices[types++] = RETRO_DEVICE_NONE;
    devices[types++] = RETRO_DEVICE_JOYPAD;
 
-   /* Only push RETRO_DEVICE_ANALOG as default if we use an 
-    * older core which doesn't use SET_CONTROLLER_INFO. */
-   if (!system->ports.size)
-      devices[types++] = RETRO_DEVICE_ANALOG;
+   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system))
+   {
+      /* Only push RETRO_DEVICE_ANALOG as default if we use an 
+       * older core which doesn't use SET_CONTROLLER_INFO. */
+      if (!system->ports.size)
+         devices[types++] = RETRO_DEVICE_ANALOG;
 
-   desc = port < system->ports.size ?
-      &system->ports.data[port] : NULL;
+      desc = port < system->ports.size ?
+         &system->ports.data[port] : NULL;
+   }
 
    if (desc)
    {
@@ -2434,14 +2436,11 @@ static int setting_bind_action_start(void *data)
    if (!keybind)
       return -1;
 
-   keybind->joykey = NO_BTN;
+   keybind->joykey  = NO_BTN;
    keybind->joyaxis = AXIS_NONE;
 
    if (setting->index_offset)
       def_binds = (struct retro_keybind*)retro_keybinds_rest;
-
-   if (!def_binds)
-      return -1;
 
    bind_type    = menu_setting_get_bind_type(setting);
    keybind->key = def_binds[bind_type - MENU_SETTINGS_BIND_BEGIN].key;
@@ -3057,9 +3056,11 @@ void general_write_handler(void *data)
          break;
       case MENU_LABEL_LOG_VERBOSITY:
          {
-            bool *verbose = retro_main_verbosity();
+            if (setting->value.target.boolean && *setting->value.target.boolean)
+               verbosity_enable();
+            else
+               verbosity_disable();
 
-            *verbose = *setting->value.target.boolean;
             global->has_set.verbosity = *setting->value.target.boolean;
          }
          break;
@@ -3563,6 +3564,16 @@ static bool setting_append_list(
                &group_info,
                &subgroup_info,
                parent_group);
+
+#if defined(HAVE_NETPLAY) && defined(HAVE_NETWORK_GAMEPAD)
+         CONFIG_ACTION(
+               list, list_info,
+               menu_hash_to_str(MENU_LABEL_START_NET_RETROPAD),
+               menu_hash_to_str(MENU_LABEL_VALUE_START_NET_RETROPAD),
+               &group_info,
+               &subgroup_info,
+               parent_group);
+#endif
 
          CONFIG_ACTION(
                list, list_info,
@@ -4068,7 +4079,7 @@ static bool setting_append_list(
 
             CONFIG_BOOL(
                   list, list_info,
-                  retro_main_verbosity(),
+                  verbosity_get_ptr(),
                   menu_hash_to_str(MENU_LABEL_LOG_VERBOSITY),
                   menu_hash_to_str(MENU_LABEL_VALUE_LOG_VERBOSITY),
                   false,

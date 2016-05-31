@@ -68,7 +68,7 @@ static int cb_image_menu_upload_generic(void *data, size_t len)
    nbio_handle_t        *nbio = (nbio_handle_t*)data;
    nbio_image_handle_t *image = (nbio_image_handle_t*)nbio->data;
 
-   if (!nbio || !image)
+   if (!image)
       return -1;
 
    if (image->processing_final_state == IMAGE_PROCESS_ERROR ||
@@ -125,23 +125,19 @@ static int task_image_process(
 
 static int cb_image_menu_generic(nbio_handle_t *nbio)
 {
+   int retval;
    unsigned width = 0, height = 0;
    nbio_image_handle_t *image = (nbio_image_handle_t*)nbio->data;
-   if (!nbio || !image)
+
+   if (!image)
       return -1;
 
-   switch (task_image_process(nbio,
-         &width, &height))
-   {
-      case IMAGE_PROCESS_ERROR:
-      case IMAGE_PROCESS_ERROR_END:
-         return -1;
-      default:
-         break;
-   }
+   retval = task_image_process(nbio, &width, &height);
+   if ((retval == IMAGE_PROCESS_ERROR) || (retval == IMAGE_PROCESS_ERROR_END))
+      return -1;
 
-   image->is_blocking_on_processing         = true;
-   image->is_finished                       = false;
+   image->is_blocking_on_processing         = (retval != IMAGE_PROCESS_END);
+   image->is_finished                       = (retval == IMAGE_PROCESS_END);
 
    return 0;
 }
@@ -161,11 +157,11 @@ static int cb_image_menu_thumbnail(void *data, size_t len)
 
 static int task_image_iterate_process_transfer(nbio_handle_t *nbio)
 {
-   unsigned i, width = 0, height = 0;
    int retval = 0;
+   unsigned i, width = 0, height = 0;
    nbio_image_handle_t *image = (nbio_image_handle_t*)nbio->data;
 
-   if (!nbio || !image)
+   if (!image)
       return -1;
 
    for (i = 0; i < image->processing_pos_increment; i++)
@@ -188,7 +184,7 @@ static int task_image_iterate_transfer(nbio_handle_t *nbio)
    unsigned i;
    nbio_image_handle_t *image = (nbio_image_handle_t*)nbio->data;
 
-   if (!nbio || !image)
+   if (!image)
       goto error;
 
    if (image->is_finished)
@@ -206,7 +202,7 @@ error:
    return -1;
 }
 
-static void rarch_task_image_load_free_internal(nbio_handle_t *nbio)
+static void task_image_load_free_internal(nbio_handle_t *nbio)
 {
    nbio_image_handle_t *image = (nbio_image_handle_t*)nbio->data;
 
@@ -249,7 +245,7 @@ static int cb_nbio_generic(nbio_handle_t *nbio, size_t *len)
    return 0;
 
 error:
-   rarch_task_image_load_free_internal(nbio);
+   task_image_load_free_internal(nbio);
    return -1;
 }
 
@@ -279,7 +275,7 @@ error:
    return -1;
 }
 
-bool rarch_task_image_load_handler(retro_task_t *task)
+bool task_image_load_handler(retro_task_t *task)
 {
    nbio_handle_t       *nbio  = (nbio_handle_t*)task->state;
    nbio_image_handle_t *image = (nbio_image_handle_t*)nbio->data;
@@ -325,7 +321,7 @@ bool rarch_task_image_load_handler(retro_task_t *task)
    return true;
 }
 
-bool rarch_task_push_image_load(const char *fullpath,
+bool task_push_image_load(const char *fullpath,
       const char *type, retro_task_callback_t cb, void *user_data)
 {
    nbio_handle_t             *nbio   = NULL;
@@ -380,8 +376,8 @@ bool rarch_task_push_image_load(const char *fullpath,
    nbio_begin_read(handle);
 
    t->state     = nbio;
-   t->handler   = rarch_task_file_load_handler;
-   t->cleanup   = rarch_task_image_load_free;
+   t->handler   = task_file_load_handler;
+   t->cleanup   = task_image_load_free;
    t->callback  = cb;
    t->user_data = user_data;
 
@@ -390,7 +386,8 @@ bool rarch_task_push_image_load(const char *fullpath,
    return true;
 
 error:
-   rarch_task_image_load_free(t);
+   nbio_free(handle);
+   task_image_load_free(t);
    free(t);
 
 error_msg:
@@ -400,12 +397,12 @@ error_msg:
    return false;
 }
 
-void rarch_task_image_load_free(retro_task_t *task)
+void task_image_load_free(retro_task_t *task)
 {
    nbio_handle_t       *nbio  = task ? (nbio_handle_t*)task->state : NULL;
 
    if (nbio) {
-      rarch_task_image_load_free_internal(nbio);
+      task_image_load_free_internal(nbio);
       nbio_free(nbio->handle);
       nbio->handle      = NULL;
       free(nbio);

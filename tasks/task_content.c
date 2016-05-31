@@ -26,6 +26,10 @@
 #include <file/file_path.h>
 #include <string/stdstring.h>
 
+#ifdef HAVE_CONFIG_H
+#include "../config.h"
+#endif
+
 #ifdef HAVE_MENU
 #include "../menu/menu_driver.h"
 #include "../menu/menu_display.h"
@@ -168,9 +172,9 @@ static int content_7zip_file_read(
 {
    CFileInStream archiveStream;
    CLookToRead lookStream;
-   CSzArEx db;
    ISzAlloc allocImp;
    ISzAlloc allocTempImp;
+   CSzArEx db;
    uint8_t *output      = 0;
    long outsize         = -1;
 
@@ -232,8 +236,10 @@ static int content_7zip_file_read(
          }
 
          SzArEx_GetFileNameUtf16(&db, i, temp);
-         res = utf16_to_char_string(temp, infile, sizeof(infile)) 
-            ? SZ_OK : SZ_ERROR_FAIL;
+         res = SZ_ERROR_FAIL;
+         if (temp)
+            res = utf16_to_char_string(temp, infile, sizeof(infile)) 
+               ? SZ_OK : SZ_ERROR_FAIL;
 
          if (string_is_equal(infile, needle))
          {
@@ -309,9 +315,9 @@ static struct string_list *compressed_7zip_file_list_new(
 {
    CFileInStream archiveStream;
    CLookToRead lookStream;
-   CSzArEx db;
    ISzAlloc allocImp;
    ISzAlloc allocTempImp;
+   CSzArEx db;
    size_t temp_size             = 0;
    struct string_list     *list = NULL;
    
@@ -379,8 +385,12 @@ static struct string_list *compressed_7zip_file_list_new(
          }
 
          SzArEx_GetFileNameUtf16(&db, i, temp);
-         res      = utf16_to_char_string(temp, infile, sizeof(infile)) 
-            ? SZ_OK : SZ_ERROR_FAIL;
+         res      = SZ_ERROR_FAIL;
+
+         if (temp)
+            res      = utf16_to_char_string(temp, infile, sizeof(infile)) 
+               ? SZ_OK : SZ_ERROR_FAIL;
+
          file_ext = path_get_extension(infile);
 
          if (string_list_find_elem_prefix(ext_list, ".", file_ext))
@@ -1072,12 +1082,12 @@ static bool load_content_from_compressed_archive(
       bool need_fullpath, const char *path)
 {
    union string_list_elem_attr attributes;
-   char new_path[PATH_MAX_LENGTH];
-   char new_basedir[PATH_MAX_LENGTH];
+   char new_path[PATH_MAX_LENGTH]    = {0};
+   char new_basedir[PATH_MAX_LENGTH] = {0};
    ssize_t new_path_len              = 0;
    bool ret                          = false;
-   settings_t *settings              = config_get_ptr();
    rarch_system_info_t      *sys_info= NULL;
+   settings_t *settings              = config_get_ptr();
 
    runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &sys_info);
 
@@ -1358,15 +1368,16 @@ static bool init_content_file_set_attribs(
       attr.i              |= system->info.need_fullpath << 1;
       attr.i              |= (!content_does_not_need_content())  << 2;
 
-      if (content_does_not_need_content()
+      char *fullpath    = NULL;
+
+      if (!runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath)
+            && content_does_not_need_content()
             && settings->set_supports_no_game_enable)
          string_list_append(content, "", attr);
       else
       {
-         char *fullpath    = NULL;
-         runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath);
-
-         string_list_append(content, fullpath, attr);
+         if(fullpath)
+            string_list_append(content, fullpath, attr);
       }
    }
 
@@ -1534,7 +1545,7 @@ static void menu_content_environment_get(int *argc, char *argv[],
          RARCH_MENU_CTL_HAS_LOAD_NO_CONTENT, NULL);
 
    if (!global->has_set.verbosity)
-      wrap_args->verbose       = *retro_main_verbosity();
+      wrap_args->verbose       = verbosity_is_enabled();
 
    wrap_args->touched          = true;
    wrap_args->config_path      = NULL;
@@ -1558,16 +1569,14 @@ static void menu_content_environment_get(int *argc, char *argv[],
 #endif
 
 /**
- * content_load_wrapper:
+ * task_load_content:
  *
  * Loads content into currently selected core.
  * Will also optionally push the content entry to the history playlist.
  *
  * Returns: true (1) if successful, otherwise false (0).
  **/
-
-static bool content_load_wrapper(
-      content_ctx_info_t *content_info,
+static bool task_load_content(content_ctx_info_t *content_info, 
       bool launched_from_menu)
 {
    char name[PATH_MAX_LENGTH];
@@ -1650,8 +1659,9 @@ error:
 
 static bool command_event_cmd_exec(void *data)
 {
+   char *fullpath;
+#if defined(HAVE_DYNAMIC)
    content_ctx_info_t content_info;
-   char *fullpath = NULL;
 
    content_info.argc        = 0;
    content_info.argv        = NULL;
@@ -1661,7 +1671,9 @@ static bool command_event_cmd_exec(void *data)
 #else
    content_info.environ_get = NULL;
 #endif
+#endif
 
+   fullpath = NULL;
    runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath);
 
    if (fullpath != data)
@@ -1672,7 +1684,7 @@ static bool command_event_cmd_exec(void *data)
    }
 
 #if defined(HAVE_DYNAMIC)
-   if (!content_load_wrapper(&content_info, false))
+   if (!task_load_content(&content_info, false))
    {
 #ifdef HAVE_MENU
       rarch_ctl(RARCH_CTL_MENU_RUNNING, NULL);
@@ -1686,7 +1698,27 @@ static bool command_event_cmd_exec(void *data)
    return true;
 }
 
-bool rarch_task_push_content_load_default(
+static bool task_load_core(const char *core_path)
+{
+   runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
+#ifdef HAVE_DYNAMIC
+   command_event(CMD_EVENT_LOAD_CORE, NULL);
+#endif
+   return true;
+}
+
+static void task_push_quickmenu(enum content_mode_load mode, enum rarch_core_type type)
+{
+#ifdef HAVE_MENU
+   if (type != CORE_TYPE_DUMMY && mode != CONTENT_MODE_LOAD_FROM_CLI)
+   {
+      menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUIT,       NULL);
+      menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, NULL);
+   }
+#endif
+}
+
+bool task_push_content_load_default(
       const char *core_path,
       const char *fullpath,
       content_ctx_info_t *content_info,
@@ -1695,26 +1727,62 @@ bool rarch_task_push_content_load_default(
       retro_task_callback_t cb,
       void *user_data)
 {
-   settings_t *settings = config_get_ptr();
-    
+   switch (mode)
+   {
+      case CONTENT_MODE_LOAD_NOTHING_WITH_CURRENT_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_FFMPEG_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_IMAGEVIEWER_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI:
+      case CONTENT_MODE_LOAD_NOTHING_WITH_DUMMY_CORE:
 #ifdef HAVE_MENU
-    switch (mode)
-    {
-        case CONTENT_MODE_LOAD_NOTHING_WITH_CURRENT_CORE_FROM_MENU:
-        case CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU:
-        case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
-        case CONTENT_MODE_LOAD_CONTENT_WITH_FFMPEG_CORE_FROM_MENU:
-        case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_MENU:
-        case CONTENT_MODE_LOAD_CONTENT_WITH_IMAGEVIEWER_CORE_FROM_MENU:
-        case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI:
-        case CONTENT_MODE_LOAD_NOTHING_WITH_DUMMY_CORE:
-           if (content_info && !content_info->environ_get)
-              content_info->environ_get = menu_content_environment_get;
-            break;
-        default:
-            break;
-    }
+         if (content_info && !content_info->environ_get)
+            content_info->environ_get = menu_content_environment_get;
 #endif
+         break;
+      default:
+         break;
+   }
+
+   switch (mode)
+   {
+      /* Clear content path */
+      case CONTENT_MODE_LOAD_NOTHING_WITH_DUMMY_CORE:
+      case CONTENT_MODE_LOAD_NOTHING_WITH_CURRENT_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
+         runloop_ctl(RUNLOOP_CTL_CLEAR_CONTENT_PATH, NULL);
+         break;
+      default:
+         break;
+   }
+
+   switch (mode)
+   {
+      /* Set content path */
+      case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_FFMPEG_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_IMAGEVIEWER_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
+         runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH,  (void*)fullpath);
+         break;
+      default:
+         break;
+   }
+
+   switch (mode)
+   {
+      case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
+         runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
+         if (!task_load_core(core_path))
+            goto error;
+         break;
+      default:
+         break;
+   }
 
    switch (mode)
    {
@@ -1725,75 +1793,46 @@ bool rarch_task_push_content_load_default(
 #endif
          runloop_ctl(RUNLOOP_CTL_DATA_DEINIT, NULL);
          runloop_ctl(RUNLOOP_CTL_TASK_INIT, NULL);
-         runloop_ctl(RUNLOOP_CTL_CLEAR_CONTENT_PATH, NULL);
-         if (!content_load_wrapper(content_info, false))
-            goto error;
-         break;
-      case CONTENT_MODE_LOAD_FROM_CLI:
-         if (!content_load_wrapper(content_info, false))
+         if (!task_load_content(content_info, false))
             goto error;
          break;
       case CONTENT_MODE_LOAD_NOTHING_WITH_CURRENT_CORE_FROM_MENU:
-         runloop_ctl(RUNLOOP_CTL_CLEAR_CONTENT_PATH, NULL);
-#ifdef HAVE_MENU
-         if (!content_load_wrapper(content_info, true))
+         if (!task_load_content(content_info, true))
             goto error;
+         break;
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
+#if defined(HAVE_NETPLAY) && defined(HAVE_NETWORK_GAMEPAD)
+         retroarch_set_current_core_type(CORE_TYPE_NETRETROPAD, true);
+         if (!task_load_content(content_info, true))
+            goto error;
+         return true;
+#else
+         break;
 #endif
+      case CONTENT_MODE_LOAD_FROM_CLI:
+         if (!task_load_content(content_info, false))
+            goto error;
          break;
       case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_MENU:
-         core_path            = settings->path.libretro;
-         runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH,  (void*)fullpath);
-         runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
-#ifdef HAVE_DYNAMIC
-         command_event(CMD_EVENT_LOAD_CORE, NULL);
-#endif
-#ifdef HAVE_MENU
-         if (!content_load_wrapper(content_info, true))
+         if (!task_load_content(content_info, true))
             goto error;
-#endif
          break;
       case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI:
-         core_path            = settings->path.libretro;
-         runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH,  (void*)fullpath);
-         runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
-#ifdef HAVE_MENU
-         if (!content_load_wrapper(content_info, true))
+         if (!task_load_content(content_info, true))
             goto error;
-#endif
          break;
       case CONTENT_MODE_LOAD_CONTENT_WITH_FFMPEG_CORE_FROM_MENU:
-         core_path            = settings->path.libretro; /* TODO/FIXME */
-         runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH,  (void*)fullpath);
-         runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
-#ifdef HAVE_DYNAMIC
-         command_event(CMD_EVENT_LOAD_CORE, NULL);
-#endif
-#ifdef HAVE_MENU
-         if (!content_load_wrapper(content_info, true))
+         if (!task_load_content(content_info, true))
             goto error;
-#endif
          break;
       case CONTENT_MODE_LOAD_CONTENT_WITH_IMAGEVIEWER_CORE_FROM_MENU:
-         core_path            = settings->path.libretro; /* TODO/FIXME */
-         runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
-#ifdef HAVE_DYNAMIC
-         command_event(CMD_EVENT_LOAD_CORE, NULL);
-#endif
-         runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH, (void*)fullpath);
-#ifdef HAVE_MENU
-         if (!content_load_wrapper(content_info, true))
+         if (!task_load_content(content_info, true))
             goto error;
-#endif
          break;
       case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
-         runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH, (void*)fullpath);
-         runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, (void*)core_path);
 #ifdef HAVE_DYNAMIC
-         command_event(CMD_EVENT_LOAD_CORE, NULL);
-#ifdef HAVE_MENU
-         if (!content_load_wrapper(content_info, true))
+         if (!task_load_content(content_info, true))
             goto error;
-#endif
 #else
          {
             char *fullpath       = NULL;
@@ -1817,19 +1856,15 @@ bool rarch_task_push_content_load_default(
          if (!command_event_cmd_exec((void*)fullpath))
             return false;
 
-         command_event(CMD_EVENT_LOAD_CORE, NULL);
+         if (!task_load_core(core_path))
+            goto error;
+         return true;
          break;
       case CONTENT_MODE_LOAD_NONE:
          break;
    }
 
-#ifdef HAVE_MENU
-   if (type != CORE_TYPE_DUMMY && mode != CONTENT_MODE_LOAD_FROM_CLI)
-   {
-      menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUIT,       NULL);
-      menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, NULL);
-   }
-#endif
+   task_push_quickmenu(mode, type);
 
    return true;
 
@@ -1838,6 +1873,7 @@ error:
    switch (mode)
    {
       case CONTENT_MODE_LOAD_NOTHING_WITH_CURRENT_CORE_FROM_MENU:
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
       case CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_MENU:
       case CONTENT_MODE_LOAD_CONTENT_WITH_FFMPEG_CORE_FROM_MENU:
       case CONTENT_MODE_LOAD_CONTENT_WITH_IMAGEVIEWER_CORE_FROM_MENU:

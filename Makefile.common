@@ -421,8 +421,12 @@ ifeq ($(HAVE_MATERIALUI), 1)
    DEFINES += -DHAVE_MATERIALUI
 endif
 ifeq ($(HAVE_NUKLEAR), 1)
-   OBJ += menu/drivers/nk_common.o
-   OBJ += menu/drivers/nk_menu.o
+   OBJ += menu/drivers/nuklear/nk_common.o
+   OBJ += menu/drivers/nuklear/nk_menu.o
+   OBJ += menu/drivers/nuklear/nk_wnd_main.o
+   OBJ += menu/drivers/nuklear/nk_wnd_file_picker.o
+   OBJ += menu/drivers/nuklear/nk_wnd_shader_parameters.o
+   OBJ += menu/drivers/nuklear/nk_wnd_settings.o
    OBJ += menu/drivers/nuklear.o
    DEFINES += -DHAVE_NUKLEAR
 endif
@@ -506,10 +510,8 @@ ifeq ($(HAVE_FREETYPE), 1)
 endif
 
 ifeq ($(HAVE_THREADS), 1)
-   OBJ += autosave.o \
-          libretro-common/rthreads/rthreads.o \
+   OBJ += libretro-common/rthreads/rthreads.o \
           libretro-common/rthreads/rsemaphore.o  \
-          libretro-common/rthreads/async_job.o \
           gfx/video_thread_wrapper.o \
           audio/audio_thread_wrapper.o
    DEFINES += -DHAVE_THREADS
@@ -1014,7 +1016,8 @@ ifeq ($(HAVE_NETWORKING), 1)
    endif
 
    ifeq ($(HAVE_NETWORK_GAMEPAD), 1)
-      OBJ += input/input_remote.o
+      OBJ += input/input_remote.o \
+				 cores/libretro-net-retropad/net_retropad_core.o
    endif
 endif
 
