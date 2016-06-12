@@ -48,23 +48,19 @@
 #include "../../verbosity.h"
 #include "../../tasks/tasks_internal.h"
 
+/* this is the main control function, it opens and closes windows, */
 static void nk_menu_main(nk_menu_handle_t *nk)
 {
+
    struct nk_context *ctx = &nk->ctx;
 
    if (nk->window[NK_WND_SETTINGS].open)
       nk_wnd_settings(nk);
-   if (nk->window[NK_WND_FILE_PICKER].open)
-      nk_wnd_file_picker(nk);
+
    if (nk->window[NK_WND_SHADER_PARAMETERS].open)
       nk_wnd_shader_parameters(nk);
    if (nk->window[NK_WND_MAIN].open)
-      nk_wnd_main(nk);
-
-   nk->window[NK_WND_SETTINGS].open = !nk_window_is_closed(ctx, "Settings");
-   nk->window[NK_WND_FILE_PICKER].open = !nk_window_is_closed(ctx, "Select File");
-   nk->window[NK_WND_SHADER_PARAMETERS].open = !nk_window_is_closed(ctx, "Shader Parameters");
-   nk->window[NK_WND_MAIN].open = !nk_window_is_closed(ctx, "Main");
+      nk_wnd_main(nk, "Demo");
 
    nk_buffer_info(&nk->status, &nk->ctx.memory);
 }
@@ -226,7 +222,8 @@ static void nk_menu_layout(nk_menu_handle_t *nk)
 
 static void nk_menu_init_device(nk_menu_handle_t *nk)
 {
-   char buf[PATH_MAX_LENGTH];
+   char buf[PATH_MAX_LENGTH] = {0};
+
    fill_pathname_join(buf, nk->assets_directory,
          "DroidSans.ttf", sizeof(buf));
 
@@ -264,6 +261,7 @@ static void nk_menu_init_device(nk_menu_handle_t *nk)
    nk->icons.page_off = nk_common_image_load(buf);
 
    nk->size_changed = true;
+   nk_common_set_style(&nk->ctx, THEME_BLUE);
 }
 
 static void *nk_menu_init(void **userdata)
@@ -288,13 +286,12 @@ static void *nk_menu_init(void **userdata)
       goto error;
 
    *userdata = nk;
-
    fill_pathname_join(nk->assets_directory, settings->directory.assets,
          "nuklear", sizeof(nk->assets_directory));
    nk_menu_init_device(nk);
 
    /* for demo puposes only, opens all windows */ 
-#if 1   
+#if 0
       for (int i=0; i < NK_WND_LAST; i++)
          nk->window[i].open = true;
 #else
@@ -348,9 +345,10 @@ static void nk_menu_context_destroy(void *data)
 static void nk_menu_context_reset(void *data)
 {
    char iconpath[PATH_MAX_LENGTH] = {0};
-   nk_menu_handle_t *nk              = (nk_menu_handle_t*)data;
+   nk_menu_handle_t *nk           = (nk_menu_handle_t*)data;
    settings_t *settings           = config_get_ptr();
-   unsigned width, height = 0;
+   unsigned width                 = 0;
+   unsigned height                = 0;
 
    video_driver_get_size(&width, &height);
 

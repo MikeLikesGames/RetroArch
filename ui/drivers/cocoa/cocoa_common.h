@@ -35,6 +35,7 @@
 #import <AVFoundation/AVCaptureOutput.h>
 #endif
 
+
 /*********************************************/
 /* RAMenuBase                                */
 /* A menu class that displays RAMenuItemBase */
@@ -100,7 +101,7 @@ void get_ios_version(int *major, int *minor);
 
 @end
 
-@interface RetroArch_OSX : NSObject
+@interface RetroArch_OSX : NSObject <NSApplicationDelegate>
 {
    NSWindow* _window;
 }
@@ -110,8 +111,6 @@ void get_ios_version(int *major, int *minor);
 @end
 
 #endif
-
-extern void apple_display_alert(const char *message, const char *title);
 
 #define BOXSTRING(x) [NSString stringWithUTF8String:x]
 #define BOXINT(x)    [NSNumber numberWithInt:x]

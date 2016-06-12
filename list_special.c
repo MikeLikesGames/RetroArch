@@ -202,6 +202,7 @@ struct string_list *string_list_new_special(enum string_list_type type,
          }
          break;
       case STRING_LIST_INPUT_HID_DRIVERS:
+#ifdef HAVE_HID
          for (i = 0; hid_driver_find_handle(i); i++)
          {
             const char *opt  = hid_driver_find_ident(i);
@@ -209,6 +210,7 @@ struct string_list *string_list_new_special(enum string_list_type type,
 
             string_list_append(s, opt, attr);
          }
+#endif
          break;
       case STRING_LIST_INPUT_JOYPAD_DRIVERS:
          for (i = 0; joypad_driver_find_handle(i); i++)
@@ -234,19 +236,21 @@ struct string_list *string_list_new_special(enum string_list_type type,
          core_info_list_get_supported_cores(core_info_list,
                (const char*)data, &core_info, list_size);
 
+         if (!core_info)
+            goto error;
+
          if (*list_size == 0)
             goto error;
 
          for (i = 0; i < *list_size; i++)
          {
-            const char *opt  = NULL;
             const core_info_t *info = (const core_info_t*)&core_info[i];
-            opt              = info ? info->path : NULL;
+            const char *opt = info->path;
 
             if (!opt)
                goto error;
 
-            *len           += strlen(opt) + 1;
+            *len += strlen(opt) + 1;
             string_list_append(s, opt, attr);
          }
          break;
@@ -255,13 +259,21 @@ struct string_list *string_list_new_special(enum string_list_type type,
          core_info_list_get_supported_cores(core_info_list,
                (const char*)data, &core_info, list_size);
 
+         if (!core_info)
+            goto error;
+
          if (*list_size == 0)
             goto error;
 
          for (i = 0; i < *list_size; i++)
          {
-            const core_info_t *info  = (const core_info_t*)&core_info[i];
-            const char          *opt = info->display_name;
+            const char          *opt = NULL;
+            core_info_t *info        = (core_info_t*)&core_info[i];
+            
+            if (!info)
+               goto error;
+            
+            opt = info->display_name;
 
             if (!opt)
                goto error;

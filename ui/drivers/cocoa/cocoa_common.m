@@ -17,6 +17,10 @@
 #import <AvailabilityMacros.h>
 #include <sys/stat.h>
 #include "cocoa_common.h"
+#ifdef HAVE_COCOA
+#include "../ui_cocoa.h"
+#endif
+#include "../../../verbosity.h"
 
 /* Define compatibility symbols and categories. */
 
@@ -64,6 +68,10 @@ void *glkitview_init(void);
    
 #if defined(HAVE_COCOA)
    [self setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+   ui_window_cocoa_t cocoa_view;
+   cocoa_view.data = (CocoaView*)self;
+    
+   [self registerForDraggedTypes:[NSArray arrayWithObjects:NSColorPboardType, NSFilenamesPboardType, nil]];
 #elif defined(HAVE_COCOATOUCH)
    self.view = (__bridge GLKView*)glkitview_init();
    
@@ -94,6 +102,41 @@ void *glkitview_init(void);
 
 - (void)keyDown:(NSEvent*)theEvent
 {
+}
+
+- (NSDragOperation)draggingEntered:(id <NSDraggingInfo>)sender
+{
+    NSDragOperation sourceDragMask = [sender draggingSourceOperationMask];
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    
+    if ( [[pboard types] containsObject:NSFilenamesPboardType] )
+    {
+        if (sourceDragMask & NSDragOperationCopy)
+            return NSDragOperationCopy;
+    }
+    
+    return NSDragOperationNone;
+}
+
+- (BOOL)performDragOperation:(id<NSDraggingInfo>)sender
+{
+    NSPasteboard *pboard = [sender draggingPasteboard];
+    
+    if ( [[pboard types] containsObject:NSURLPboardType])
+    {
+        NSURL *fileURL = [NSURL URLFromPasteboard:pboard];
+        NSString *s = [fileURL path];
+        if (s != nil)
+        {
+           RARCH_LOG("Drop name is: %s\n", [s UTF8String]);
+        }
+    }
+    return YES;
+}
+
+- (void)draggingExited:(id <NSDraggingInfo>)sender
+{
+    [self setNeedsDisplay: YES];
 }
 
 #elif defined(HAVE_COCOATOUCH)

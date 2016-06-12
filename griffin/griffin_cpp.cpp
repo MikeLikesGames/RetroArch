@@ -121,6 +121,23 @@ VIDEO CONTEXT
 #endif
 
 /*============================================================
+UI
+============================================================ */
+
+#if defined(_WIN32) && !defined(_XBOX)
+#include "../ui/drivers/win32/ui_win32_window.cpp"
+#endif
+
+#if defined(HAVE_QT)
+#include "../ui/drivers/ui_qt.cpp"
+
+#include "../ui/drivers/qt/ui_qt_window.cpp"
+#include "../ui/drivers/qt/ui_qt_browser_window.cpp"
+#include "../ui/drivers/qt/ui_qt_msg_window.cpp"
+#include "../ui/drivers/qt/ui_qt_application.cpp"
+#endif
+
+/*============================================================
 VIDEO DRIVER
 ============================================================ */
 #ifdef _XBOX

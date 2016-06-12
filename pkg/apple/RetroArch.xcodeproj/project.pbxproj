@@ -383,6 +383,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.5;
 				OTHER_CFLAGS = (
 					"-DHAVE_GRIFFIN",
+               "-DHAVE_LANGEXTRA",
                "-DHAVE_CHEEVOS",
 					"-DHAVE_IMAGEVIEWER",
 					"-DHAVE_CORETEXT",
@@ -417,6 +418,7 @@
 					"-DHAVE_ZARCH",
 					"-DHAVE_HID",
 					"-DHAVE_XMB",
+               "-DHAVE_SHADERPIPELINE",
                "-DHAVE_MMAP",
 					"-DHAVE_LIBRETRODB",
 				);
@@ -447,6 +449,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.5;
 				OTHER_CFLAGS = (
 					"-DHAVE_GRIFFIN",
+               "-DHAVE_LANGEXTRA",
                "-DHAVE_CHEEVOS",
 					"-DHAVE_IMAGEVIEWER",
 					"-DHAVE_IOHIDMANAGER",
@@ -481,6 +484,7 @@
 					"-DHAVE_ZARCH",
 					"-DHAVE_HID",
 					"-DHAVE_XMB",
+               "-DHAVE_SHADERPIPELINE",
                "-DHAVE_MMAP",
 					"-DHAVE_LIBRETRODB",
 				);
@@ -513,6 +517,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.5;
 				OTHER_CFLAGS = (
 					"-DHAVE_GRIFFIN",
+               "-DHAVE_LANGEXTRA",
                "-DHAVE_CHEEVOS",
 					"-DHAVE_IMAGEVIEWER",
 					"-DHAVE_CORETEXT",
@@ -546,6 +551,7 @@
 					"-DHAVE_ZARCH",
 					"-DHAVE_HID",
 					"-DHAVE_XMB",
+               "-DHAVE_SHADERPIPELINE",
                "-DHAVE_MMAP",
 					"-DHAVE_LIBRETRODB",
 				);
@@ -576,6 +582,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.5;
 				OTHER_CFLAGS = (
 					"-DHAVE_GRIFFIN",
+               "-DHAVE_LANGEXTRA",
                "-DHAVE_CHEEVOS",
 					"-DHAVE_IMAGEVIEWER",
 					"-DHAVE_IOHIDMANAGER",
@@ -609,6 +616,7 @@
 					"-DHAVE_ZARCH",
 					"-DHAVE_HID",
 					"-DHAVE_XMB",
+               "-DHAVE_SHADERPIPELINE",
                "-DHAVE_MMAP",
 					"-DHAVE_LIBRETRODB",
 				);

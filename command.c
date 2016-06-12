@@ -102,6 +102,39 @@ struct command
    bool state[RARCH_BIND_LIST_END];
 };
 
+enum cmd_source_t { cmd_none, cmd_stdin, cmd_network };
+#if defined(HAVE_STDIN_CMD) || defined(HAVE_NETWORK_CMD) && defined(HAVE_NETPLAY)
+static enum cmd_source_t lastcmd_source;
+#endif
+#if defined(HAVE_NETWORK_CMD) && defined(HAVE_NETPLAY)
+static int lastcmd_net_fd;
+static struct sockaddr_storage lastcmd_net_source;
+static socklen_t lastcmd_net_source_len;
+#endif
+
+#ifdef HAVE_CHEEVOS
+#if defined(HAVE_STDIN_CMD) || defined(HAVE_NETWORK_CMD) && defined(HAVE_NETPLAY)
+static bool command_reply(const char * data, size_t len)
+{
+#ifdef HAVE_STDIN_CMD
+   if (lastcmd_source == cmd_stdin)
+   {
+      fwrite(data, 1,len, stdout);
+      return true;
+   }
+#endif
+#if defined(HAVE_NETWORK_CMD) && defined(HAVE_NETPLAY)
+   if (lastcmd_source == cmd_network)
+   {
+      sendto(lastcmd_net_fd, data, len, 0, (struct sockaddr*)&lastcmd_net_source, lastcmd_net_source_len);
+      return true;
+   }
+#endif
+   return false;
+}
+#endif
+#endif
+
 struct cmd_map
 {
    const char *str;
@@ -157,8 +190,75 @@ static bool command_set_shader(const char *arg)
    return video_driver_set_shader(type, arg);
 }
 
+
+#ifdef HAVE_CHEEVOS
+static bool command_read_ram(const char *arg)
+{
+   cheevos_var_t var;
+   const uint8_t * data;
+   unsigned nbytes;
+   int i;
+   char reply[256];
+   char *reply_at = NULL;
+
+   strcpy(reply, "READ_CORE_RAM ");
+   reply_at = reply + strlen("READ_CORE_RAM ");
+   strcpy(reply_at, arg);
+
+   cheevos_parse_guest_addr(&var, strtoul(reply_at, (char**)&reply_at, 16));
+   data = cheevos_get_memory(&var);
+   
+   if (data)
+   {
+      unsigned nbytes = strtol(reply_at, NULL, 10);
+      
+      for (i=0;i<nbytes;i++)
+      {
+         sprintf(reply_at+3*i, " %.2X", data[i]);
+      }
+      reply_at[3*nbytes] = '\n';
+      command_reply(reply, reply_at+3*nbytes+1 - reply);
+   }
+   else
+   {
+      strcpy(reply_at, " -1\n");
+      command_reply(reply, reply_at+strlen(" -1\n") - reply);
+   }
+
+
+   return true;
+}
+
+static bool command_write_ram(const char *arg)
+{
+   cheevos_var_t var;
+   uint8_t * data;
+   unsigned nbytes;
+   int i;
+   char reply[256];
+
+   cheevos_parse_guest_addr(&var, strtoul(arg, (char**)&arg, 16));
+   data = cheevos_get_memory(&var);
+
+   if (!data) return false;
+
+   while (*arg)
+   {
+      *data = strtoul(arg, (char**)&arg, 16);
+      data++;
+   }
+
+   return true;
+   return false;
+}
+#endif
+
 static const struct cmd_action_map action_map[] = {
    { "SET_SHADER", command_set_shader, "<shader path>" },
+#ifdef HAVE_CHEEVOS
+   { "READ_CORE_RAM", command_read_ram, "<address> <number of bytes>" },
+   { "WRITE_CORE_RAM", command_write_ram, "<address> <byte1> <byte2> ..." },
+#endif
 };
 
 static const struct cmd_map map[] = {
@@ -182,7 +282,7 @@ static const struct cmd_map map[] = {
    { "CHEAT_TOGGLE",           RARCH_CHEAT_TOGGLE },
    { "SCREENSHOT",             RARCH_SCREENSHOT },
    { "MUTE",                   RARCH_MUTE },
-   { "OSK",                   RARCH_OSK },
+   { "OSK",                    RARCH_OSK },
    { "NETPLAY_FLIP",           RARCH_NETPLAY_FLIP },
    { "SLOWMOTION",             RARCH_SLOWMOTION },
    { "VOLUME_UP",              RARCH_VOLUME_UP },
@@ -198,6 +298,7 @@ static const struct cmd_map map[] = {
    { "MENU_LEFT",              RETRO_DEVICE_ID_JOYPAD_LEFT },
    { "MENU_RIGHT",             RETRO_DEVICE_ID_JOYPAD_RIGHT },
    { "MENU_A",                 RETRO_DEVICE_ID_JOYPAD_A },
+   { "MENU_B",                 RETRO_DEVICE_ID_JOYPAD_B },
    { "MENU_B",                 RETRO_DEVICE_ID_JOYPAD_B },
 };
 
@@ -264,16 +365,19 @@ static void command_parse_sub_msg(command_t *handle, const char *tok)
             msg_hash_to_str(MSG_RECEIVED));
 }
 
-static void command_parse_msg(command_t *handle, char *buf)
+static void command_parse_msg(command_t *handle, char *buf, enum cmd_source_t source)
 {
    char *save      = NULL;
    const char *tok = strtok_r(buf, "\n", &save);
+
+   lastcmd_source = source;
 
    while (tok)
    {
       command_parse_sub_msg(handle, tok);
       tok = strtok_r(NULL, "\n", &save);
    }
+   lastcmd_source = cmd_none;
 }
 
 #if defined(HAVE_NETWORK_CMD) && defined(HAVE_NETPLAY)
@@ -448,15 +552,20 @@ static void command_network_poll(command_t *handle)
 
    for (;;)
    {
+      ssize_t ret;
       char buf[1024];
-      ssize_t ret = recvfrom(handle->net_fd, buf,
-            sizeof(buf) - 1, 0, NULL, NULL);
+
+      lastcmd_net_fd = handle->net_fd;
+      lastcmd_net_source_len = sizeof(lastcmd_net_source);
+      ret = recvfrom(handle->net_fd, buf,
+            sizeof(buf) - 1, 0, (struct sockaddr*)&lastcmd_net_source, &lastcmd_net_source_len);
 
       if (ret <= 0)
          break;
 
       buf[ret] = '\0';
-      command_parse_msg(handle, buf);
+
+      command_parse_msg(handle, buf, cmd_network);
    }
 }
 #endif
@@ -659,7 +768,7 @@ static void command_stdin_poll(command_t *handle)
    *last_newline++ = '\0';
    msg_len = last_newline - handle->stdin_buf;
 
-   command_parse_msg(handle, handle->stdin_buf);
+   command_parse_msg(handle, handle->stdin_buf, cmd_stdin);
 
    memmove(handle->stdin_buf, last_newline,
          handle->stdin_buf_ptr - msg_len);
@@ -996,9 +1105,12 @@ static void command_event_init_controllers(void)
       const struct retro_controller_description *desc = NULL;
       unsigned device = settings->input.libretro_device[i];
 
-      if (i < info->ports.size)
-         desc = libretro_find_controller_description(
-               &info->ports.data[i], device);
+      if (info)
+      {
+         if (i < info->ports.size)
+            desc = libretro_find_controller_description(
+                  &info->ports.data[i], device);
+      }
 
       if (desc)
          ident = desc->desc;
@@ -1466,6 +1578,25 @@ static void command_event_save_state(const char *path,
       char *s, size_t len)
 {
    settings_t *settings = config_get_ptr();
+   char buf[PATH_MAX_LENGTH] = {0};
+
+   /* if a save state already exists rename it to .last before saving 
+    * so it can be recovered */
+   if (path_file_exists(path))
+   {
+      strlcpy(buf, path, sizeof(buf));
+      snprintf(buf, sizeof(buf), "%s", path);
+      path_remove_extension(buf);
+      snprintf(buf, sizeof(buf), "%s.last", buf);
+
+      if (!content_rename_state(path, buf))
+      {
+         snprintf(s, len, "%s \"%s\".",
+               msg_hash_to_str(MSG_FAILED_TO_SAVE_UNDO),
+               path);
+         return;
+      }
+   }
 
    if (!content_save_state(path))
    {
@@ -1491,9 +1622,29 @@ static void command_event_save_state(const char *path,
  *
  * Loads a state with path being @path.
  **/
-static void command_event_load_state(const char *path, char *s, size_t len)
+static void command_event_load_state(const char *path, char *s, size_t len, bool undo)
 {
    settings_t *settings = config_get_ptr();
+   char buf[PATH_MAX_LENGTH] = {0};
+
+   /* save a state before loading (unless it's an undo operation already) 
+    * so the state can be recovered
+    */
+   if (!undo)
+   {
+      strlcpy(buf, path, sizeof(buf));
+      snprintf(buf, sizeof(buf), "%s", path);
+      path_remove_extension(buf);
+      snprintf(buf, sizeof(buf), "%s.undo", buf);
+
+      if (!content_save_state(buf))
+      {
+         snprintf(s, len, "%s \"%s\".",
+               msg_hash_to_str(MSG_FAILED_TO_SAVE_UNDO),
+               path);
+         return;
+      }
+   }
 
    if (!content_load_state(path))
    {
@@ -1506,15 +1657,18 @@ static void command_event_load_state(const char *path, char *s, size_t len)
    if (settings->state_slot < 0)
       snprintf(s, len, "%s #-1 (auto).",
             msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT));
-   else
+   else if (!undo)
       snprintf(s, len, "%s #%d.", msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT),
             settings->state_slot);
+   else
+      snprintf(s, len, "%s #-1 (undo).", msg_hash_to_str(MSG_LOADED_STATE_FROM_SLOT));
 }
 
 static void command_event_main_state(unsigned cmd)
 {
    retro_ctx_size_info_t info;
    char path[PATH_MAX_LENGTH] = {0};
+   char buf[PATH_MAX_LENGTH]  = {0};
    char msg[128]              = {0};
    global_t *global           = global_get_ptr();
    settings_t *settings       = config_get_ptr();
@@ -1538,7 +1692,33 @@ static void command_event_main_state(unsigned cmd)
             command_event_save_state(path, msg, sizeof(msg));
             break;
          case CMD_EVENT_LOAD_STATE:
-            command_event_load_state(path, msg, sizeof(msg));
+            command_event_load_state(path, msg, sizeof(msg), false);
+            break;
+         case CMD_EVENT_UNDO_LOAD_STATE:
+            strlcpy(buf, path, sizeof(buf));
+            path_remove_extension(buf);
+            snprintf(buf, sizeof(buf), "%s.undo", buf);
+
+            if (path_file_exists(buf))
+               command_event_load_state(buf, msg, sizeof(msg), true);
+            else
+            {
+               snprintf(msg, sizeof(msg), "%s.",
+                  msg_hash_to_str(MSG_FAILED_TO_LOAD_UNDO));
+            }
+            break;
+         case CMD_EVENT_UNDO_SAVE_STATE:
+            strlcpy(buf, path, sizeof(buf));
+            path_remove_extension(buf);
+            snprintf(buf, sizeof(buf), "%s.last", buf);
+
+            if (path_file_exists(buf))
+               command_event_load_state(buf, msg, sizeof(msg), true);
+            else
+            {
+               snprintf(msg, sizeof(msg), "%s.",
+                  msg_hash_to_str(MSG_FAILED_TO_LOAD_UNDO));
+            }
             break;
       }
    }
@@ -1660,6 +1840,12 @@ bool command_event(enum event_command cmd, void *data)
 
          command_event_main_state(cmd);
          break;
+      case CMD_EVENT_UNDO_LOAD_STATE:
+         command_event_main_state(cmd);
+         break;
+      case CMD_EVENT_UNDO_SAVE_STATE:
+         command_event_main_state(cmd);
+         break;
       case CMD_EVENT_RESIZE_WINDOWED_SCALE:
          {
             unsigned idx = 0;
@@ -1667,7 +1853,7 @@ bool command_event(enum event_command cmd, void *data)
 
             if (runloop_ctl(RUNLOOP_CTL_GET_WINDOWED_SCALE, &window_scale))
             {
-               if (*window_scale == 0)
+               if (!window_scale || *window_scale == 0)
                   return false;
 
                settings->video.scale = *window_scale;

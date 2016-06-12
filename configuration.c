@@ -777,7 +777,9 @@ static void config_set_defaults(void)
    settings->menu_scroll_down_btn = default_menu_btn_scroll_down;
    settings->menu_scroll_up_btn   = default_menu_btn_scroll_up;
 
+#ifdef HAVE_LANGEXTRA
    settings->user_language = 0;
+#endif
 
    global->console.sound.system_bgm_enable = false;
 
@@ -931,10 +933,10 @@ static void config_set_defaults(void)
  **/
 static config_file_t *open_default_config_file(void)
 {
-   char application_data[PATH_MAX_LENGTH];
-   char conf_path[PATH_MAX_LENGTH] = {0};
-   char app_path[PATH_MAX_LENGTH]  = {0};
-   config_file_t *conf             = NULL;
+   char application_data[PATH_MAX_LENGTH] = {0};
+   char conf_path[PATH_MAX_LENGTH]        = {0};
+   char app_path[PATH_MAX_LENGTH]         = {0};
+   config_file_t *conf                    = NULL;
 
 #if defined(_WIN32) && !defined(_XBOX)
    fill_pathname_application_path(app_path, sizeof(app_path));
@@ -1739,12 +1741,13 @@ static bool config_load_file(const char *path, bool set_defaults)
    settings->bluetooth_enable = path_file_exists(LAKKA_BLUETOOTH_PATH);
 #endif
 
-#ifdef HAVE_NETWORK_GAMEPAD
+#ifdef HAVE_NETWORKGAMEPAD
    CONFIG_GET_BOOL_BASE(conf, settings, network_remote_enable, "network_remote_enable");
    for (i = 0; i < MAX_USERS; i++)
    {
       bool tmp_bool = false;
       char tmp[64]  = {0};
+
       snprintf(tmp, sizeof(tmp), "network_remote_enable_user_p%u", i + 1);
 
       if (config_get_bool(conf, tmp, &tmp_bool))
@@ -1772,7 +1775,9 @@ static bool config_load_file(const char *path, bool set_defaults)
 
    if (!rarch_ctl(RARCH_CTL_HAS_SET_USERNAME, NULL))
       config_get_path(conf, "netplay_nickname",  settings->username, sizeof(settings->username));
+#ifdef HAVE_LANGEXTRA
    CONFIG_GET_INT_BASE(conf, settings, user_language, "user_language");
+#endif
 #ifdef HAVE_NETPLAY
    if (!global->has_set.netplay_mode)
       CONFIG_GET_BOOL_BASE(conf, global, netplay.is_spectate,
@@ -1944,8 +1949,8 @@ static void config_load_core_specific(void)
  */
 bool config_load_override(void)
 {
-   char buf[PATH_MAX_LENGTH];
-   char config_directory[PATH_MAX_LENGTH];
+   char buf[PATH_MAX_LENGTH]              = {0};
+   char config_directory[PATH_MAX_LENGTH] = {0};
    char core_path[PATH_MAX_LENGTH]        = {0};
    char game_path[PATH_MAX_LENGTH]        = {0};
    config_file_t *new_conf                = NULL;
@@ -1966,18 +1971,8 @@ bool config_load_override(void)
    if (string_is_empty(core_name) || string_is_empty(game_name))
       return false;
 
-   /* Config directory: config_directory.
-    * Try config directory setting first,
-    * fallback to the location of the current configuration file. */
-   if (!string_is_empty(settings->directory.menu_config))
-      strlcpy(config_directory,
-            settings->directory.menu_config,
-            sizeof(config_directory));
-   else if (!string_is_empty(global->path.config))
-      fill_pathname_basedir(config_directory,
-            global->path.config, sizeof(config_directory));
-   else
-      return false;
+   fill_pathname_application_special(config_directory, sizeof(config_directory),
+         APPLICATION_SPECIAL_DIRECTORY_CONFIG);
 
    /* Concatenate strings into full paths for core_path, game_path */
    fill_pathname_join(game_path,
@@ -2124,7 +2119,7 @@ bool config_unload_override(void)
  */
 bool config_load_remap(void)
 {
-   char remap_directory[PATH_MAX_LENGTH];    /* path to the directory containing retroarch.cfg (prefix)    */
+   char remap_directory[PATH_MAX_LENGTH]   = {0};    /* path to the directory containing retroarch.cfg (prefix)    */
    char core_path[PATH_MAX_LENGTH]         = {0};    /* final path for core-specific configuration (prefix+suffix) */
    char game_path[PATH_MAX_LENGTH]         = {0};    /* final path for game-specific configuration (prefix+suffix) */
    config_file_t *new_conf                 = NULL;
@@ -2344,7 +2339,7 @@ static void save_keybind_axis(config_file_t *conf, const char *prefix,
 
    if (dir)
    {
-      char config[16];
+      char config[16] = {0};
       snprintf(config, sizeof(config), "%c%u", dir, axis);
       config_set_string(conf, key, config);
    }
@@ -2530,7 +2525,6 @@ bool config_save_file(const char *path)
 {
    float msg_color;
    unsigned i           = 0;
-   bool tmp_bool        = false;
    bool ret             = false;
    config_file_t *conf  = config_file_new(path);
    settings_t *settings = config_get_ptr();
@@ -2895,7 +2889,9 @@ bool config_save_file(const char *path)
    config_set_int(conf, "netplay_delay_frames", global->netplay.sync_frames);
 #endif
    config_set_string(conf, "netplay_nickname", settings->username);
+#ifdef HAVE_LANGEXTRA
    config_set_int(conf, "user_language", settings->user_language);
+#endif
 
    config_set_bool(conf, "custom_bgm_enable",
          global->console.sound.system_bgm_enable);
@@ -2919,7 +2915,7 @@ bool config_save_file(const char *path)
       config_set_int(conf, cfg, settings->input.analog_dpad_mode[i]);
    }
 
-#ifdef HAVE_NETWORK_GAMEPAD
+#ifdef HAVE_NETWORKGAMEPAD
    for (i = 0; i < MAX_USERS; i++)
    {
       char tmp[64] = {0};

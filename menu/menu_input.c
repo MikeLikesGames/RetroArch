@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include <features/features_cpu.h>
+#include <string/stdstring.h>
 
 #include "menu_driver.h"
 #include "menu_input.h"
@@ -213,14 +214,15 @@ void menu_input_st_string_cb(void *userdata, const char *str)
 
       menu_input_ctl(MENU_INPUT_CTL_KEYBOARD_LABEL_SETTING, &label);
 
-      setting = menu_setting_find(label);
+      if (!string_is_empty(label))
+         setting = menu_setting_find(label);
 
       if (setting)
       {
          menu_setting_set_with_string_representation(setting, str);
          menu_setting_generic(setting, false);
       }
-      else
+      else if (!string_is_empty(label))
       {
          uint32_t hash_label = menu_hash_calculate(label);
 

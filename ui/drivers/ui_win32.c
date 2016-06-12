@@ -1,6 +1,6 @@
 /* RetroArch - A frontend for libretro.
- *  Copyright (C) 2015      - Ali Bouhlel
- *  Copyright (C) 2011-2015 - Daniel De Matteis
+ *  Copyright (C) 2015-2016 - Ali Bouhlel
+ *  Copyright (C) 2011-2016 - Daniel De Matteis
  *
  * RetroArch is free software: you can redistribute it and/or modify it under the terms
  * of the GNU General Public License as published by the Free Software Found-
@@ -54,6 +54,7 @@
 
 #include "../../gfx/common/gl_common.h"
 #include "../../gfx/common/win32_common.h"
+#include "ui_win32.h"
 
 #define SHADER_DLG_WIDTH                  220
 #define SHADER_DLG_MIN_HEIGHT             200
@@ -93,10 +94,7 @@ typedef struct
    enum shader_param_ctrl_type type;
    union
    {
-      struct
-      {
-         HWND hwnd;
-      } checkbox;
+      ui_window_win32_t checkbox;
       struct
       {
          HWND hwnd;
@@ -108,14 +106,14 @@ typedef struct
 
 typedef struct
 {
-   HWND hwnd;
-   HWND on_top_checkbox;
-   HWND separator;
+   ui_window_win32_t window;
+   ui_window_win32_t separator;
+   ui_window_win32_t on_top_checkbox;
    shader_param_ctrl_t controls[GFX_MAX_PARAMETERS];
    int parameters_start_y;
 } shader_dlg_t;
 
-static shader_dlg_t g_shader_dlg = {0};
+static shader_dlg_t g_shader_dlg = {{0}};
 
 static void shader_dlg_refresh_trackbar_label(int index)
 {
@@ -189,6 +187,7 @@ static void shader_dlg_params_clear(void)
 
    for (i = 0; i < GFX_MAX_PARAMETERS; i++)
    {
+      const ui_window_t *window = ui_companion_driver_get_window_ptr();
       shader_param_ctrl_t*control = &g_shader_dlg.controls[i];
 
       if (control->type == SHADER_PARAM_CTRL_NONE)
@@ -199,7 +198,8 @@ static void shader_dlg_params_clear(void)
          case SHADER_PARAM_CTRL_NONE:
             break;
          case SHADER_PARAM_CTRL_CHECKBOX:
-            DestroyWindow(control->checkbox.hwnd);
+            if (window)
+               window->destroy(&control->checkbox);
             break;
          case SHADER_PARAM_CTRL_TRACKBAR:
             DestroyWindow(control->trackbar.label_title);
@@ -218,7 +218,7 @@ void shader_dlg_params_reload(void)
    RECT parent_rect;
    int i, pos_x, pos_y;
    video_shader_ctx_t shader_info;
-
+   const ui_window_t *window = ui_companion_driver_get_window_ptr();
    video_shader_driver_get_current_shader(&shader_info);
 
    shader_dlg_params_clear();
@@ -254,7 +254,7 @@ void shader_dlg_params_reload(void)
                shader_info.data->parameters[i].desc,
                WS_CHILD | WS_VISIBLE | BS_AUTOCHECKBOX, pos_x, pos_y,
                SHADER_DLG_CTRL_WIDTH, SHADER_DLG_CHECKBOX_HEIGHT,
-               g_shader_dlg.hwnd, (HMENU)(size_t)i, NULL, NULL);
+               g_shader_dlg.window.hwnd, (HMENU)(size_t)i, NULL, NULL);
          SendMessage(control->checkbox.hwnd, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
          pos_y += SHADER_DLG_CHECKBOX_HEIGHT + SHADER_DLG_CTRL_MARGIN;
       }
@@ -271,7 +271,7 @@ void shader_dlg_params_reload(void)
          control->trackbar.label_title = CreateWindowEx(0, "STATIC",
                shader_info.data->parameters[i].desc,
                WS_CHILD | WS_VISIBLE | SS_LEFT, pos_x, pos_y,
-               SHADER_DLG_CTRL_WIDTH, SHADER_DLG_LABEL_HEIGHT, g_shader_dlg.hwnd,
+               SHADER_DLG_CTRL_WIDTH, SHADER_DLG_LABEL_HEIGHT, g_shader_dlg.window.hwnd,
                (HMENU)(size_t)i, NULL, NULL);
          SendMessage(control->trackbar.label_title, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
@@ -280,12 +280,12 @@ void shader_dlg_params_reload(void)
                WS_CHILD | WS_VISIBLE | TBS_HORZ | TBS_NOTICKS,
                pos_x + SHADER_DLG_TRACKBAR_LABEL_WIDTH, pos_y,
                SHADER_DLG_TRACKBAR_WIDTH, SHADER_DLG_TRACKBAR_HEIGHT,
-               g_shader_dlg.hwnd, (HMENU)(size_t)i, NULL, NULL);
+               g_shader_dlg.window.hwnd, (HMENU)(size_t)i, NULL, NULL);
 
          control->trackbar.label_val = CreateWindowEx(0, "STATIC", "",
                WS_CHILD | WS_VISIBLE | SS_LEFT, pos_x,
                pos_y, SHADER_DLG_TRACKBAR_LABEL_WIDTH, SHADER_DLG_LABEL_HEIGHT,
-               g_shader_dlg.hwnd, (HMENU)(size_t)i, NULL, NULL);
+               g_shader_dlg.window.hwnd, (HMENU)(size_t)i, NULL, NULL);
          SendMessage(control->trackbar.label_val, WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
          SendMessage(control->trackbar.hwnd, TBM_SETBUDDY, (WPARAM)TRUE,
@@ -297,21 +297,21 @@ void shader_dlg_params_reload(void)
 
    }
 
-   if (g_shader_dlg.separator)
-      DestroyWindow(g_shader_dlg.separator);
+   if (window && g_shader_dlg.separator.hwnd)
+      window->destroy(&g_shader_dlg.separator);
 
-   g_shader_dlg.separator = CreateWindowEx(0, "STATIC", "",
+   g_shader_dlg.separator.hwnd = CreateWindowEx(0, "STATIC", "",
          SS_ETCHEDHORZ | WS_VISIBLE | WS_CHILD, SHADER_DLG_CTRL_X,
          g_shader_dlg.parameters_start_y - SHADER_DLG_CTRL_MARGIN - SHADER_DLG_SEPARATOR_HEIGHT / 2,
          (pos_x - SHADER_DLG_CTRL_X) + SHADER_DLG_CTRL_WIDTH,
          SHADER_DLG_SEPARATOR_HEIGHT / 2,
-         g_shader_dlg.hwnd, NULL, NULL,
+         g_shader_dlg.window.hwnd, NULL, NULL,
          NULL);
 
    shader_dlg_params_refresh();
 
-   GetWindowRect(g_shader_dlg.hwnd, &parent_rect);
-   SetWindowPos(g_shader_dlg.hwnd, NULL, 0, 0,
+   GetWindowRect(g_shader_dlg.window.hwnd, &parent_rect);
+   SetWindowPos(g_shader_dlg.window.hwnd, NULL, 0, 0,
          (pos_x - SHADER_DLG_CTRL_X) + SHADER_DLG_WIDTH,
          (pos_x == SHADER_DLG_CTRL_X) ? pos_y + 30 : SHADER_DLG_MAX_HEIGHT,
          SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -320,24 +320,30 @@ void shader_dlg_params_reload(void)
 
 static void shader_dlg_update_on_top_state(void)
 {
-   bool on_top = SendMessage(g_shader_dlg.on_top_checkbox, BM_GETCHECK, 0, 0) == BST_CHECKED;
-   SetWindowPos(g_shader_dlg.hwnd, on_top ? HWND_TOPMOST : HWND_NOTOPMOST , 0, 0, 0, 0,
+   bool on_top = SendMessage(g_shader_dlg.on_top_checkbox.hwnd,
+         BM_GETCHECK, 0, 0) == BST_CHECKED;
+
+   SetWindowPos(g_shader_dlg.window.hwnd, on_top 
+         ? HWND_TOPMOST : HWND_NOTOPMOST , 0, 0, 0, 0,
          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 }
 
 void shader_dlg_show(HWND parent_hwnd)
 {
-   if (!IsWindowVisible(g_shader_dlg.hwnd))
+   const ui_window_t *window = ui_companion_driver_get_window_ptr();
+
+   if (!IsWindowVisible(g_shader_dlg.window.hwnd))
    {
       if (parent_hwnd)
       {
          RECT parent_rect;
          GetWindowRect(parent_hwnd, &parent_rect);
-         SetWindowPos(g_shader_dlg.hwnd, HWND_TOP, parent_rect.right, parent_rect.top,
+         SetWindowPos(g_shader_dlg.window.hwnd, HWND_TOP,
+               parent_rect.right, parent_rect.top,
                0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
       }
       else
-         ShowWindow(g_shader_dlg.hwnd, SW_SHOW);
+         window->set_visible(&g_shader_dlg.window, true);
 
       shader_dlg_update_on_top_state();
 
@@ -345,7 +351,7 @@ void shader_dlg_show(HWND parent_hwnd)
 
    }
 
-   SetFocus(g_shader_dlg.hwnd);
+   window->set_focused(&g_shader_dlg.window);
 }
 
 static LRESULT CALLBACK ShaderDlgWndProc(HWND hwnd, UINT message,
@@ -353,6 +359,7 @@ static LRESULT CALLBACK ShaderDlgWndProc(HWND hwnd, UINT message,
 {
    int i, pos;
    video_shader_ctx_t shader_info;
+   const ui_window_t *window = ui_companion_driver_get_window_ptr();
 
    video_shader_driver_get_current_shader(&shader_info);
 
@@ -364,7 +371,8 @@ static LRESULT CALLBACK ShaderDlgWndProc(HWND hwnd, UINT message,
       case WM_CLOSE:
       case WM_DESTROY:
       case WM_QUIT:
-         ShowWindow(g_shader_dlg.hwnd, 0);
+         if (window)
+            window->set_visible(&g_shader_dlg.window, false);
          return 0;
 
       case WM_COMMAND:
@@ -384,9 +392,11 @@ static LRESULT CALLBACK ShaderDlgWndProc(HWND hwnd, UINT message,
 
          if (SendMessage(g_shader_dlg.controls[i].checkbox.hwnd,
                   BM_GETCHECK, 0, 0) == BST_CHECKED)
-            shader_info.data->parameters[i].current = shader_info.data->parameters[i].maximum;
+            shader_info.data->parameters[i].current = 
+               shader_info.data->parameters[i].maximum;
          else
-            shader_info.data->parameters[i].current = shader_info.data->parameters[i].minimum;
+            shader_info.data->parameters[i].current = 
+               shader_info.data->parameters[i].minimum;
 
          break;
 
@@ -448,7 +458,7 @@ bool win32_shader_dlg_init(void)
    int pos_y;
    HFONT hFont;
 
-   if (g_shader_dlg.hwnd)
+   if (g_shader_dlg.window.hwnd)
       return true;
 
    if (!inited)
@@ -473,19 +483,19 @@ bool win32_shader_dlg_init(void)
 
    hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
 
-   g_shader_dlg.hwnd = CreateWindowEx(0, "Shader Dialog", "Shader Parameters",
+   g_shader_dlg.window.hwnd = CreateWindowEx(0, "Shader Dialog", "Shader Parameters",
          WS_POPUPWINDOW | WS_CAPTION, 100, 100,
          SHADER_DLG_WIDTH, SHADER_DLG_MIN_HEIGHT, NULL, NULL, NULL, NULL);
 
    pos_y = SHADER_DLG_CTRL_MARGIN;
-   g_shader_dlg.on_top_checkbox = CreateWindowEx(0, "BUTTON", "Always on Top",
+   g_shader_dlg.on_top_checkbox.hwnd = CreateWindowEx(0, "BUTTON", "Always on Top",
          BS_AUTOCHECKBOX | WS_VISIBLE | WS_CHILD,
          SHADER_DLG_CTRL_X, pos_y, SHADER_DLG_CTRL_WIDTH,
-         SHADER_DLG_CHECKBOX_HEIGHT, g_shader_dlg.hwnd,
+         SHADER_DLG_CHECKBOX_HEIGHT, g_shader_dlg.window.hwnd,
          (HMENU)SHADER_DLG_CHECKBOX_ONTOP_ID, NULL, NULL);
    pos_y +=  SHADER_DLG_CHECKBOX_HEIGHT + SHADER_DLG_CTRL_MARGIN;
 
-   SendMessage(g_shader_dlg.on_top_checkbox,
+   SendMessage(g_shader_dlg.on_top_checkbox.hwnd,
          WM_SETFONT, (WPARAM)hFont, MAKELPARAM(TRUE, 0));
 
    pos_y +=  SHADER_DLG_SEPARATOR_HEIGHT + SHADER_DLG_CTRL_MARGIN;
@@ -495,31 +505,36 @@ bool win32_shader_dlg_init(void)
    return true;
 }
 
-bool win32_browser(
+static bool win32_browser(
       HWND owner,
       char *filename,
       const char *extensions,
       const char *title,
       const char *initial_dir)
 {
-   OPENFILENAME ofn;
+   bool result = false;
+   const ui_browser_window_t *browser = 
+      ui_companion_driver_get_browser_window_ptr();
 
-   memset((void*)&ofn, 0, sizeof(OPENFILENAME));
+   if (browser)
+   {
+      ui_browser_window_state_t browser_state;
 
-   ofn.lStructSize     = sizeof(OPENFILENAME);
-   ofn.hwndOwner       = owner;
-   ofn.lpstrFilter     = extensions;
-   ofn.lpstrFile       = filename;
-   ofn.lpstrTitle      = title;
-   ofn.lpstrInitialDir = TEXT(initial_dir);
-   ofn.lpstrDefExt     = "";
-   ofn.nMaxFile        = PATH_MAX;
-   ofn.Flags           = OFN_FILEMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+      browser_state.filters  = strdup(extensions);
+      browser_state.title    = strdup(title);
+      browser_state.startdir = strdup(initial_dir);
+      browser_state.path     = strdup(filename);
+      browser_state.window   = owner;
 
-   if (!GetOpenFileName(&ofn))
-      return false;
+      result = browser->open(&browser_state);
 
-   return true;
+      free(browser_state.filters);
+      free(browser_state.title);
+      free(browser_state.startdir);
+      free(browser_state.path);
+   }
+
+   return result;
 }
 
 LRESULT win32_menu_loop(HWND owner, WPARAM wparam)
@@ -542,7 +557,7 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam)
             switch (mode)
             {
                case ID_M_LOAD_CORE:
-                  extensions  = "All Files\0*.*\0 Libretro core(.dll)\0*.dll\0";
+                  extensions  = "Libretro core (.dll)\0*.dll\0\All Files\0*.*\0";
 #ifdef HAVE_MENU
                   title       = menu_hash_to_str(MENU_LABEL_VALUE_CORE_LIST);
 #else
@@ -562,18 +577,19 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam)
                   break;
             }
 
-            if (win32_browser(owner, win32_file,
+            if (!win32_browser(owner, win32_file,
                      extensions, title, initial_dir))
-            {
-               content_ctx_info_t content_info = {0};
+               break;
 
-               switch (mode)
-               {
-                  case ID_M_LOAD_CORE:
-                     runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, win32_file);
-                     cmd         = CMD_EVENT_LOAD_CORE;
-                     break;
-                  case ID_M_LOAD_CONTENT:
+            switch (mode)
+            {
+               case ID_M_LOAD_CORE:
+                  runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, win32_file);
+                  cmd         = CMD_EVENT_LOAD_CORE;
+                  break;
+               case ID_M_LOAD_CONTENT:
+                  {
+                     content_ctx_info_t content_info = {0};
                      runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH, win32_file);
 
                      do_wm_close = true;
@@ -583,8 +599,8 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam)
                            CORE_TYPE_PLAIN,
                            CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI,
                            NULL, NULL);
-                     break;
-               }
+                  }
+                  break;
             }
          }
          break;
@@ -725,5 +741,9 @@ const ui_companion_driver_t ui_companion_win32 = {
    NULL,
    NULL,
    NULL,
+   &ui_browser_window_win32,
+   &ui_msg_window_win32,
+   &ui_window_win32,
+   &ui_application_win32,
    "win32",
 };

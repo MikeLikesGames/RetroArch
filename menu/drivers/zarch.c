@@ -30,12 +30,14 @@
 #include <formats/image.h>
 #include <compat/strl.h>
 #include <retro_stat.h>
+#include <string/stdstring.h>
 
 #include "menu_generic.h"
 
 #include "../../config.def.h"
 
 #include "../../list_special.h"
+#include "../../file_path_special.h"
 
 #include "../menu_driver.h"
 #include "../menu_animation.h"
@@ -166,30 +168,6 @@ struct zui_tabbed
 
 
 static enum zarch_layout_type zarch_layout;
-
-static void zarch_zui_font(void)
-{
-   int font_size;
-   char mediapath[PATH_MAX_LENGTH], fontpath[PATH_MAX_LENGTH];
-   menu_display_ctx_font_t font_info;
-   settings_t *settings = config_get_ptr();
-
-   font_size = menu_display_get_font_size();
-
-   fill_pathname_join(
-         mediapath,
-         settings->directory.assets,
-         "zarch",
-         sizeof(mediapath));
-   fill_pathname_join(fontpath,
-         mediapath, "Roboto-Condensed.ttf", sizeof(fontpath));
-
-   font_info.path = fontpath;
-   font_info.size = font_size;
-
-   if (!menu_display_font_main_init(&font_info))
-      RARCH_WARN("Failed to load font.");
-}
 
 static float zarch_zui_strwidth(void *fb_buf, const char *text, float scale)
 {
@@ -340,8 +318,8 @@ static bool zarch_zui_list_item(zui_t *zui, struct zui_tabbed *tab, int x1, int 
       const char *label, unsigned item_id, const char *entry, bool selected)
 {
    menu_animation_ctx_ticker_t ticker;
-   char title_buf[PATH_MAX_LENGTH];
    unsigned ticker_size;
+   char title_buf[PATH_MAX_LENGTH] = {0};
    uint64_t *frame_count = NULL;
    unsigned           id = zarch_zui_hash(zui, label);
    int                x2 = x1 + zui->width - 290 - 40;
@@ -587,9 +565,9 @@ static void zarch_zui_render_lay_root_load_set_new_path(zui_t *zui,
 static int zarch_zui_render_lay_root_load(zui_t *zui,
       struct zui_tabbed *tabbed)
 {
-   char parent_dir[PATH_MAX_LENGTH];
-   settings_t *settings   = config_get_ptr();
-   core_info_list_t *list = NULL;
+   char parent_dir[PATH_MAX_LENGTH] = {0};
+   settings_t           *settings   = config_get_ptr();
+   core_info_list_t           *list = NULL;
 
    if (zarch_zui_tab(zui, tabbed, "Load", 1))
    {
@@ -651,9 +629,9 @@ static int zarch_zui_render_lay_root_load(zui_t *zui,
 
             for (i = skip + zui->load_dlist_first; i < size; ++i)
             {
-               char label[PATH_MAX_LENGTH];
-               const char *path     = NULL;
-               const char *basename = NULL;
+               char label[PATH_MAX_LENGTH] = {0};
+               const char        *path     = NULL;
+               const char        *basename = NULL;
 
                if (j > 10)
                   break;
@@ -728,7 +706,7 @@ static int zarch_zui_render_lay_root_downloads(
 
 static int zarch_zui_render_lay_root(zui_t *zui)
 {
-   char item[PATH_MAX_LENGTH];
+   char item[PATH_MAX_LENGTH]      = {0};
    static struct zui_tabbed tabbed = {~0U};
 
    zarch_zui_tabbed_begin(zui, &tabbed, 0, 0);
@@ -1034,7 +1012,7 @@ static void *zarch_init(void **userdata)
 
    matrix_4x4_ortho(&zui->mvp, 0, 1, 1, 0, 0, 1);
 
-   zarch_zui_font();
+   menu_display_font(APPLICATION_SPECIAL_DIRECTORY_ASSETS_ZARCH_FONT);
 
    return menu;
 error:
@@ -1119,7 +1097,7 @@ static void zarch_context_reset(void *data)
    menu_display_allocate_white_texture();
 
    menu_display_set_font_size(zui->font_size);
-   zarch_zui_font();
+   menu_display_font(APPLICATION_SPECIAL_DIRECTORY_ASSETS_ZARCH_FONT);
 }
 
 static int zarch_iterate(void *data, void *userdata, enum menu_action action)

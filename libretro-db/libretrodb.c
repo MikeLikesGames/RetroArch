@@ -482,6 +482,7 @@ int libretrodb_create_index(libretrodb_t *db,
 
    /* We know we aren't going to change it */
    key.val.string.buff = (char *) field_name;
+   item.type           = RDT_NULL;
 
    while (libretrodb_cursor_read_item(&cur, &item) == 0)
    {
@@ -557,7 +558,6 @@ int libretrodb_create_index(libretrodb_t *db,
    nictx.db = db;
    nictx.idx = &idx;
    bintree_iterate(tree, node_iter, &nictx);
-   bintree_free(tree);
 
 clean:
    rmsgpack_dom_value_free(&item);
@@ -565,7 +565,8 @@ clean:
       free(buff);
    if (cur.is_valid)
       libretrodb_cursor_close(&cur);
-   bintree_free(tree);
+   if (tree)
+      bintree_free(tree);
    free(tree);
    return 0;
 }

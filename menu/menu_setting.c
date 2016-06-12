@@ -1074,7 +1074,8 @@ static void setting_get_string_representation_uint_libretro_device(void *data,
 
    index_offset = menu_setting_get_index_offset(setting);
 
-   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system))
+   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system)
+         && system)
    {
       if (index_offset < system->ports.size)
          desc = libretro_find_controller_description(
@@ -1146,6 +1147,7 @@ static void setting_get_string_representation_uint_autosave_interval(void *data,
 }
 #endif
 
+#ifdef HAVE_LANGEXTRA
 static void setting_get_string_representation_uint_user_language(void *data,
       char *s, size_t len)
 {
@@ -1170,6 +1172,7 @@ static void setting_get_string_representation_uint_user_language(void *data,
    if (settings)
       strlcpy(s, modes[settings->user_language], len);
 }
+#endif
 
 static void setting_get_string_representation_uint_libretro_log_level(void *data,
       char *s, size_t len)
@@ -2360,15 +2363,16 @@ static int setting_action_start_libretro_device_type(void *data)
    devices[types++] = RETRO_DEVICE_NONE;
    devices[types++] = RETRO_DEVICE_JOYPAD;
 
-   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system))
+   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system) 
+         && system)
    {
       /* Only push RETRO_DEVICE_ANALOG as default if we use an 
        * older core which doesn't use SET_CONTROLLER_INFO. */
       if (!system->ports.size)
          devices[types++] = RETRO_DEVICE_ANALOG;
 
-      desc = port < system->ports.size ?
-         &system->ports.data[port] : NULL;
+      if (port < system->ports.size)
+         desc = &system->ports.data[port];
    }
 
    if (desc)
@@ -2499,8 +2503,6 @@ static int setting_action_left_libretro_device_type(
    settings_t      *settings   = config_get_ptr();
    rarch_system_info_t *system = NULL;
 
-   runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
-
    if (!setting)
       return -1;
 
@@ -2509,13 +2511,18 @@ static int setting_action_left_libretro_device_type(
    devices[types++] = RETRO_DEVICE_NONE;
    devices[types++] = RETRO_DEVICE_JOYPAD;
 
-   /* Only push RETRO_DEVICE_ANALOG as default if we use an 
-    * older core which doesn't use SET_CONTROLLER_INFO. */
-   if (!system->ports.size)
-      devices[types++] = RETRO_DEVICE_ANALOG;
+   runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
 
-   if (port < system->ports.size)
-      desc = &system->ports.data[port];
+   if (system)
+   {
+      /* Only push RETRO_DEVICE_ANALOG as default if we use an 
+       * older core which doesn't use SET_CONTROLLER_INFO. */
+      if (!system->ports.size)
+         devices[types++] = RETRO_DEVICE_ANALOG;
+
+      if (port < system->ports.size)
+         desc = &system->ports.data[port];
+   }
 
    if (desc)
    {
@@ -2564,8 +2571,6 @@ static int setting_action_right_libretro_device_type(
    settings_t      *settings   = config_get_ptr();
    rarch_system_info_t *system = NULL;
 
-   runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
-
    if (!setting)
       return -1;
 
@@ -2574,13 +2579,17 @@ static int setting_action_right_libretro_device_type(
    devices[types++] = RETRO_DEVICE_NONE;
    devices[types++] = RETRO_DEVICE_JOYPAD;
 
-   /* Only push RETRO_DEVICE_ANALOG as default if we use an 
-    * older core which doesn't use SET_CONTROLLER_INFO. */
-   if (!system->ports.size)
-      devices[types++] = RETRO_DEVICE_ANALOG;
+   if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system) 
+         && system)
+   {
+      /* Only push RETRO_DEVICE_ANALOG as default if we use an 
+       * older core which doesn't use SET_CONTROLLER_INFO. */
+      if (!system->ports.size)
+         devices[types++] = RETRO_DEVICE_ANALOG;
 
-   if (port < system->ports.size)
-      desc = &system->ports.data[port];
+      if (port < system->ports.size)
+         desc = &system->ports.data[port];
+   }
 
    if (desc)
    {
@@ -3068,9 +3077,10 @@ void general_write_handler(void *data)
          video_driver_set_filtering(1, settings->video.smooth);
          break;
       case MENU_LABEL_VIDEO_ROTATION:
-         video_driver_set_rotation(
-               (*setting->value.target.unsigned_integer +
-                system->rotation) % 4);
+         if (system)
+            video_driver_set_rotation(
+                  (*setting->value.target.unsigned_integer +
+                   system->rotation) % 4);
          break;
       case MENU_LABEL_AUDIO_VOLUME:
          audio_driver_set_volume_gain(db_to_gain(*setting->value.target.fraction));
@@ -3565,7 +3575,7 @@ static bool setting_append_list(
                &subgroup_info,
                parent_group);
 
-#if defined(HAVE_NETPLAY) && defined(HAVE_NETWORK_GAMEPAD)
+#if defined(HAVE_NETPLAY) && defined(HAVE_NETWORKGAMEPAD)
          CONFIG_ACTION(
                list, list_info,
                menu_hash_to_str(MENU_LABEL_START_NET_RETROPAD),
@@ -6052,6 +6062,7 @@ static bool setting_append_list(
                   general_write_handler,
                   general_read_handler);
 
+#ifdef HAVE_SHADERPIPELINE
             CONFIG_UINT(
                   list, list_info,
                   &settings->menu.shader_pipeline,
@@ -6064,6 +6075,7 @@ static bool setting_append_list(
                   general_write_handler,
                   general_read_handler);
             menu_settings_list_current_add_range(list, list_info, 0, 2, 1, true, true);
+#endif
 
             CONFIG_UINT(
                   list, list_info,
@@ -6219,6 +6231,20 @@ static bool setting_append_list(
 
          CONFIG_BOOL(
                list, list_info,
+               &settings->pause_nonactive,
+               menu_hash_to_str(MENU_LABEL_PAUSE_NONACTIVE),
+               menu_hash_to_str(MENU_LABEL_VALUE_PAUSE_NONACTIVE),
+               pause_nonactive,
+               menu_hash_to_str(MENU_VALUE_OFF),
+               menu_hash_to_str(MENU_VALUE_ON),
+               &group_info,
+               &subgroup_info,
+               parent_group,
+               general_write_handler,
+               general_read_handler);
+
+         CONFIG_BOOL(
+               list, list_info,
                &settings->video.disable_composition,
                menu_hash_to_str(MENU_LABEL_VIDEO_DISABLE_COMPOSITION),
                menu_hash_to_str(MENU_LABEL_VALUE_VIDEO_DISABLE_COMPOSITION),
@@ -6232,20 +6258,6 @@ static bool setting_append_list(
                general_read_handler);
          menu_settings_list_current_add_cmd(list, list_info, CMD_EVENT_REINIT);
          settings_data_list_current_add_flags(list, list_info, SD_FLAG_CMD_APPLY_AUTO);
-
-         CONFIG_BOOL(
-               list, list_info,
-               &settings->pause_nonactive,
-               menu_hash_to_str(MENU_LABEL_PAUSE_NONACTIVE),
-               menu_hash_to_str(MENU_LABEL_VALUE_PAUSE_NONACTIVE),
-               pause_nonactive,
-               menu_hash_to_str(MENU_VALUE_OFF),
-               menu_hash_to_str(MENU_VALUE_ON),
-               &group_info,
-               &subgroup_info,
-               parent_group,
-               general_write_handler,
-               general_read_handler);
 
          CONFIG_BOOL(
                list, list_info,
@@ -6766,6 +6778,7 @@ static bool setting_append_list(
                general_read_handler);
          settings_data_list_current_add_flags(list, list_info, SD_FLAG_ALLOW_INPUT);
 
+#ifdef HAVE_LANGEXTRA
          CONFIG_UINT(
                list, list_info,
                &settings->user_language,
@@ -6789,6 +6802,7 @@ static bool setting_append_list(
          menu_settings_list_current_add_cmd(list, list_info, CMD_EVENT_MENU_REFRESH);
          (*list)[list_info->index - 1].get_string_representation = 
             &setting_get_string_representation_uint_user_language;
+#endif
 
          END_SUB_GROUP(list, list_info, parent_group);
          END_GROUP(list, list_info, parent_group);

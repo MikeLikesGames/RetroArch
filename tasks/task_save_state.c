@@ -18,10 +18,17 @@
 #include <sys/types.h>
 #include <string.h>
 #include <time.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include <errno.h>
 
 #include <lists/string_list.h>
 #include <streams/file_stream.h>
+#include <file/file_path.h>
 
 #include "../core.h"
 #include "../msg_hash.h"
@@ -195,10 +202,11 @@ bool content_load_state(const char *path)
    for (i = 0; i < num_blocks; i++)
       free(blocks[i].data);
    free(blocks);
-   free(buf);
    
    if (!ret)
       goto error;
+
+   free(buf);
 
    return true;
 
@@ -207,5 +215,19 @@ error:
          msg_hash_to_str(MSG_FAILED_TO_LOAD_STATE),
          path);
    free(buf);
+   return false;
+}
+
+bool content_rename_state(const char *origin, const char *dest)
+{
+   int ret = 0;
+   if (path_file_exists(dest))
+      unlink(dest);
+
+   ret = rename (origin, dest);
+   if (!ret)
+      return true;
+
+   RARCH_LOG ("Error %d renaming file %s", ret, origin);
    return false;
 }

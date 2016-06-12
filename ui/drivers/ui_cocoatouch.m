@@ -1,5 +1,5 @@
 /* RetroArch - A frontend for libretro.
- *  Copyright (C) 2011-2015 - Daniel De Matteis
+ *  Copyright (C) 2011-2016 - Daniel De Matteis
  *
  * RetroArch is free software: you can redistribute it and/or modify it under the terms
  * of the GNU General Public License as published by the Free Software Found-
@@ -43,7 +43,7 @@ static id apple_platform;
 static CFRunLoopObserverRef iterate_observer;
 
 /* forward declaration */
-void apple_rarch_exited(void);
+static void apple_rarch_exited(void);
 
 static void rarch_enable_ui(void)
 {
@@ -534,7 +534,8 @@ int main(int argc, char *argv[])
    }
 }
 
-void apple_display_alert(const char *message, const char *title)
+#if 0
+static void apple_display_alert(const char *message, const char *title)
 {
    UIAlertView* alert = [[UIAlertView alloc] initWithTitle:BOXSTRING(title)
                                              message:BOXSTRING(message)
@@ -543,8 +544,9 @@ void apple_display_alert(const char *message, const char *title)
                                              otherButtonTitles:nil];
    [alert show];
 }
+#endif
 
-void apple_rarch_exited(void)
+static void apple_rarch_exited(void)
 {
     RetroArch_iOS *ap = (RetroArch_iOS *)apple_platform;
     
@@ -687,5 +689,9 @@ const ui_companion_driver_t ui_companion_cocoatouch = {
    ui_companion_cocoatouch_notify_refresh,
    ui_companion_cocoatouch_msg_queue_push,
    ui_companion_cocoatouch_render_messagebox,
+   &ui_browser_window_null,
+   &ui_msg_window_null,
+   &ui_window_null,
+   &ui_application_null,
    "cocoatouch",
 };

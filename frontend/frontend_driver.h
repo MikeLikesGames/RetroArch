@@ -17,17 +17,17 @@
 #ifndef __FRONTEND_DRIVER_H
 #define __FRONTEND_DRIVER_H
 
+#include <stdint.h>
 #include <stddef.h>
 
 #include <boolean.h>
+#include <retro_common_api.h>
 
 #ifdef HAVE_CONFIG_H
 #include "../config.h"
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
 
 enum frontend_powerstate
 {
@@ -80,6 +80,7 @@ typedef struct frontend_ctx_driver
    enum frontend_architecture (*get_architecture)(void);
    enum frontend_powerstate (*get_powerstate)(int *seconds, int *percent);
    int  (*parse_drive_list)(void*);
+   uint32_t (*get_total_mem)(void);
 
    const char *ident;
 
@@ -153,8 +154,8 @@ bool frontend_driver_get_core_extension(char *s, size_t len);
 
 bool frontend_driver_get_salamander_basename(char *s, size_t len);
 
-#ifdef __cplusplus
-}
-#endif
+uint32_t frontend_driver_get_total_memory(void);
+
+RETRO_END_DECLS
 
 #endif

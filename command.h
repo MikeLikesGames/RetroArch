@@ -23,10 +23,9 @@
 
 #include <stdint.h>
 #include <boolean.h>
+#include <retro_common_api.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
 
 typedef struct command command_t;
 
@@ -49,6 +48,8 @@ enum event_command
    CMD_EVENT_LOAD_CORE_PERSIST,
    CMD_EVENT_UNLOAD_CORE,
    CMD_EVENT_LOAD_STATE,
+   CMD_EVENT_UNDO_LOAD_STATE,
+   CMD_EVENT_UNDO_SAVE_STATE,
    CMD_EVENT_SAVE_STATE,
    CMD_EVENT_SAVE_STATE_DECREMENT,
    CMD_EVENT_SAVE_STATE_INCREMENT,
@@ -244,9 +245,6 @@ bool command_free(command_t *handle);
  **/
 bool command_event(enum event_command action, void *data);
 
-#ifdef __cplusplus
-}
-#endif
+RETRO_END_DECLS
 
 #endif
-

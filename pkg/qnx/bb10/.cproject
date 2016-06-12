@@ -39,6 +39,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -46,6 +47,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
@@ -170,6 +172,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -177,6 +180,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
@@ -303,6 +307,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -310,6 +315,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
@@ -437,6 +443,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -444,6 +451,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
@@ -569,6 +577,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -576,6 +585,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
@@ -701,6 +711,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -708,6 +719,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>
@@ -834,6 +846,7 @@
 									<listOptionValue builtIn="false" value="HAVE_ALSA"/>
 									<listOptionValue builtIn="false" value="RARCH_INTERNAL"/>
 									<listOptionValue builtIn="false" value="HAVE_XMB"/>
+									<listOptionValue builtIn="false" value="HAVE_SHADERPIPELINE"/>
 									<listOptionValue builtIn="false" value="HAVE_MATERIALUI"/>
 									<listOptionValue builtIn="false" value="HAVE_RGUI"/>
 									<listOptionValue builtIn="false" value="HAVE_MENU"/>
@@ -841,6 +854,7 @@
 									<listOptionValue builtIn="false" value="SINC_LOWER_QUALITY"/>
 									<listOptionValue builtIn="false" value="HAVE_FBO"/>
 									<listOptionValue builtIn="false" value="HAVE_GRIFFIN"/>
+									<listOptionValue builtIn="false" value="HAVE_LANGEXTRA"/>
 									<listOptionValue builtIn="false" value="__LIBRETRO__"/>
 									<listOptionValue builtIn="false" value="HAVE_DYNAMIC"/>
 									<listOptionValue builtIn="false" value="HAVE_ZLIB"/>

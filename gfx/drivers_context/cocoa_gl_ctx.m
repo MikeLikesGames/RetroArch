@@ -76,6 +76,7 @@
 #endif
 
 #if defined(HAVE_COCOATOUCH)
+
 static GLKView *g_view;
 UIView *g_pause_indicator_view;
 #endif
@@ -88,6 +89,7 @@ static bool g_is_syncing = true;
 static bool g_use_hw_ctx;
 
 #if defined(HAVE_COCOA)
+#include "../../ui/drivers/ui_cocoa.h"
 static NSOpenGLPixelFormat* g_format;
 
 void *glcontext_get_ptr(void)
@@ -161,7 +163,7 @@ void *get_chosen_screen(void)
 
    if (settings->video.monitor_index >= screens.count)
    {
-      RARCH_WARN("video_monitor_index is greater than the number of connected monitors; using main screen instead.\n");
+      RARCH_WARN("video_monitor_index is greater than the number of connected monitors; using main screen instead.");
 #if __has_feature(objc_arc)
       return (__bridge void*)screens;
 #else
@@ -410,19 +412,18 @@ static void cocoagl_gfx_ctx_get_video_size(void *data, unsigned* width, unsigned
 
 static void cocoagl_gfx_ctx_update_window_title(void *data)
 {
-   static char buf[128] = {0};
-   static char buf_fps[128] = {0};
-   bool got_text = video_monitor_get_fps(buf, sizeof(buf),
-         buf_fps, sizeof(buf_fps));
-   settings_t *settings = config_get_ptr();
-
-   (void)got_text;
-
+   static char buf_fps[128]   = {0};
+   settings_t *settings       = config_get_ptr();
 #if defined(HAVE_COCOA)
-   CocoaView *g_view = (CocoaView*)nsview_get_ptr();
-   static const char* const text = buf; /* < Can't access buffer directly in the block */
-   if (got_text)
-       [[g_view window] setTitle:[NSString stringWithCString:text encoding:NSUTF8StringEncoding]];
+   static char buf[128]       = {0};
+   ui_window_cocoa_t view;
+   const ui_window_t *window  = ui_companion_driver_get_window_ptr();
+
+   view.data = (CocoaView*)nsview_get_ptr();
+
+   if (window && video_monitor_get_fps(buf, sizeof(buf),
+         buf_fps, sizeof(buf_fps)))
+       window->set_title(&view, buf);
 #endif
     if (settings->fps_show)
         runloop_msg_queue_push(buf_fps, 1, 1, false);
@@ -432,9 +433,9 @@ static bool cocoagl_gfx_ctx_get_metrics(void *data, enum display_metric_types ty
             float *value)
 {
 #if __has_feature(objc_arc)
-    RAScreen *screen               = (__bridge RAScreen*)get_chosen_screen();
+    RAScreen *screen              = (__bridge RAScreen*)get_chosen_screen();
 #else
-    RAScreen *screen               = (RAScreen*)get_chosen_screen();
+    RAScreen *screen              = (RAScreen*)get_chosen_screen();
 #endif
 #if defined(HAVE_COCOA)
     NSDictionary *description     = [screen deviceDescription];

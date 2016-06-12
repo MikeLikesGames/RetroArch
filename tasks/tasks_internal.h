@@ -17,7 +17,9 @@
 #define TASKS_HANDLER_INTERNAL_H
 
 #include <stdint.h>
+
 #include <boolean.h>
+#include <retro_common_api.h>
 
 #include <queues/message_queue.h>
 #include <queues/task_queue.h>
@@ -25,6 +27,8 @@
 #include "../content.h"
 #include "../core_type.h"
 #include "../runloop.h"
+
+RETRO_BEGIN_DECLS
 
 enum content_mode_load
 {
@@ -38,6 +42,7 @@ enum content_mode_load
    CONTENT_MODE_LOAD_CONTENT_WITH_FFMPEG_CORE_FROM_MENU,
    CONTENT_MODE_LOAD_CONTENT_WITH_IMAGEVIEWER_CORE_FROM_MENU,
    CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI,
+   CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI,
    CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU
 };
 
@@ -129,5 +134,7 @@ void task_file_load_handler(retro_task_t *task);
 bool take_screenshot(void);
 bool dump_to_file_desperate(const void *data,
       size_t size, unsigned type);
+
+RETRO_END_DECLS
 
 #endif

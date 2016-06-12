@@ -1,5 +1,6 @@
 /*  RetroArch - A frontend for libretro.
  *  Copyright (C) 2010-2014 - Hans-Kristian Arntzen
+ *  Copyright (C) 2011-2016 - Daniel De Matteis
  * 
  *  RetroArch is free software: you can redistribute it and/or modify it under the terms
  *  of the GNU General Public License as published by the Free Software Found-
@@ -13,30 +14,34 @@
  *  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Test module to check re-entrancy of libretro implementations.
- * Reruns the program's main loop with all content defined on command-line
- * to check if libretro can load multiple content after each other.
- */
+#ifndef _WIN32_UI
+#define _WIN32_UI
 
-#include "../getopt_rarch.h"
-#include "../general.h"
-#include <string.h>
+#include <stdint.h>
+#include <stddef.h>
 
-int rarch_main(int argc, char *argv[], void *data);
+#include <boolean.h>
+#include <retro_common_api.h>
 
-#undef main
-int main(int argc, char *argv[])
+#ifndef _XBOX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#endif
+
+#include "../ui_companion_driver.h"
+
+RETRO_BEGIN_DECLS
+
+typedef struct ui_application_win32
 {
-   while (rarch_main(argc, argv, NULL) == 0)
-   {
-      if (optind + 1 >= argc)
-         return 0;
+   void *empty;
+} ui_application_win32_t;
 
-      memmove(&argv[optind], &argv[optind + 1],
-            (argc - optind - 1) * sizeof(char*));
-      argc--;
+typedef struct ui_window_win32
+{
+   HWND hwnd;
+} ui_window_win32_t;
 
-      runloop_ctl(RUNLOOP_CTL_CLEAR_STATE);
-   }
-}
+RETRO_END_DECLS
 
+#endif

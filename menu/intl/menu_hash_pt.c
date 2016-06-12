@@ -35,6 +35,16 @@ const char *menu_hash_to_str_pt(uint32_t hash)
 {
    switch (hash)
    {
+      case MENU_LABEL_VALUE_START_NET_RETROPAD:
+         return "Iniciar RetroPad Remoto";
+      case MENU_LABEL_VALUE_SCAN_THIS_DIRECTORY:
+         return "<Escanear este Diretório>";
+      case MENU_LABEL_VALUE_SCAN_FILE:
+         return "Escanear Arquivo";
+      case MENU_LABEL_VALUE_SCAN_DIRECTORY:
+         return "Escanear Diretório";
+      case MENU_LABEL_VALUE_START_CORE:
+         return "Iniciar Core";
       case MENU_LABEL_VALUE_INFORMATION_LIST:
          return "Informação";
       case MENU_LABEL_VALUE_USE_BUILTIN_PLAYER:
@@ -463,6 +473,10 @@ const char *menu_hash_to_str_pt(uint32_t hash)
          return "Definições";
       case MENU_LABEL_VALUE_QUIT_RETROARCH:
          return "Sair do RetroArch";
+      case MENU_LABEL_VALUE_SHUTDOWN:
+         return "Desligar";
+      case MENU_LABEL_VALUE_REBOOT:
+         return "Reiniciar";
       case MENU_LABEL_VALUE_HELP:
          return "Ajuda";
       case MENU_LABEL_VALUE_SAVE_NEW_CONFIG:

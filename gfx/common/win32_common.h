@@ -25,6 +25,7 @@
 #endif
 
 #include <boolean.h>
+#include <retro_common_api.h>
 #include "../../driver.h"
 #include "../video_context_driver.h"
 
@@ -34,11 +35,13 @@
 
 #ifndef _XBOX
 #include "../../ui/drivers/ui_win32_resource.h"
+#include "../../ui/drivers/ui_win32.h"
 
 extern unsigned g_resize_width;
 extern unsigned g_resize_height;
 extern bool g_inited;
 extern bool g_restore_desktop;
+extern ui_window_win32_t main_window;
 
 LRESULT win32_handle_keyboard_event(HWND hwnd, UINT message,
       WPARAM wparam, LPARAM lparam);
@@ -54,7 +57,7 @@ void shader_dlg_show(HWND parent_hwnd);
 void shader_dlg_params_reload(void);
 #endif
 
-void win32_monitor_from_window(HWND data, bool destroy);
+void win32_monitor_from_window(void);
 
 void win32_monitor_init(void);
 
@@ -66,15 +69,11 @@ bool win32_monitor_set_fullscreen(unsigned width,
       unsigned height, unsigned refresh, char *dev_name);
 
 #ifndef _XBOX
-#ifdef __cplusplus
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
 
 bool win32_window_init(WNDCLASSEX *wndclass, bool fullscreen, const char *class_name);
 
-#ifdef __cplusplus
-}
-#endif
+RETRO_END_DECLS
 #endif
 
 bool win32_window_create(void *data, unsigned style,

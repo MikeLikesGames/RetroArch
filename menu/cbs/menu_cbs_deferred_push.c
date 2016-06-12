@@ -152,7 +152,7 @@ static int deferred_push_database_manager_list_deferred(
 static int deferred_push_cursor_manager_list_deferred(
       menu_displaylist_info_t *info)
 {
-   char rdb_path[PATH_MAX_LENGTH];
+   char rdb_path[PATH_MAX_LENGTH] = {0};
    int ret                        = -1;
    char *query                    = NULL;
    char *rdb                      = NULL;
@@ -410,7 +410,10 @@ static int general_push(menu_displaylist_info_t *info,
                      sizeof(info->exts));
          }
          else
-            strlcpy(info->exts, system->valid_extensions, sizeof(info->exts));
+         {
+            if (!string_is_empty(system->valid_extensions))
+               strlcpy(info->exts, system->valid_extensions, sizeof(info->exts));
+         }
          break;
       case PUSH_DETECT_CORE_LIST:
          if (!string_is_empty(list->all_ext))

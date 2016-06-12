@@ -20,6 +20,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include <retro_common_api.h>
+
 #define MSG_UNKNOWN                                   0x3a834e55U
 #define MSG_PROGRAM                                   0xc339565dU
 #define MSG_FOUND_SHADER                              0x817f42b7U
@@ -123,6 +125,9 @@
 #define MSG_CORE_DOES_NOT_SUPPORT_SAVESTATES          0xd50adf46U
 #define MSG_FAILED_TO_LOAD_STATE                      0x91f348ebU
 
+#define MSG_FAILED_TO_LOAD_UNDO                       0xb6e2fc55U
+#define MSG_FAILED_TO_SAVE_UNDO                       0xf2e29478U
+
 #define MSG_RESET                                     0x10474288U
 
 #define MSG_AUDIO_MUTED                               0xfa0c3bd5U
@@ -157,6 +162,8 @@
 #define MSG_DOWNLOADING                               0x465305dbU
 #define MSG_EXTRACTING                                0x25a4c19eU
 
+RETRO_BEGIN_DECLS
+
 const char *msg_hash_to_str(uint32_t hash);
 
 const char *msg_hash_to_str_fr(uint32_t hash);
@@ -182,6 +189,8 @@ const char *msg_hash_to_str_nl(uint32_t hash);
 const char *msg_hash_to_str_us(uint32_t hash);
 
 uint32_t msg_hash_calculate(const char *s);
+
+RETRO_END_DECLS
 
 #endif
 

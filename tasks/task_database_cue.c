@@ -144,6 +144,7 @@ static int detect_ps1_game_sub(const char *track_path,
       char *game_id, int sub_channel_mixed)
 {
    uint8_t* tmp;
+   uint8_t* boot_file;
    int skip, frame_size, is_mode1, cd_sector;
    uint8_t buffer[2048 * 2] = {0};
    RFILE                *fp = filestream_open(track_path, RFILE_MODE_READ, -1);
@@ -180,7 +181,7 @@ static int detect_ps1_game_sub(const char *track_path,
    while (tmp < (buffer + 2048 * 2))
    {
       if (!*tmp)
-         return 0;
+         goto error;
 
       if (!strncasecmp((const char*)(tmp + 33), "SYSTEM.CNF;1", 12))
          break;
@@ -189,37 +190,54 @@ static int detect_ps1_game_sub(const char *track_path,
    }
 
    if(tmp >= (buffer + 2048 * 2))
-   {
-      filestream_close(fp);
-      return 0;
-   }
+      goto error;
 
    cd_sector = tmp[2] | (tmp[3] << 8) | (tmp[4] << 16);
-   filestream_seek(fp, 13 + skip + cd_sector * frame_size, SEEK_SET);
+   filestream_seek(fp, skip + cd_sector * frame_size, SEEK_SET);
    filestream_read(fp, buffer, 256);
+   buffer[256] = '\0';
 
-   tmp = (uint8_t*)strrchr((const char*)buffer, '\\');
-   if(!tmp)
-      tmp = buffer;
-   else
+   tmp = buffer;
+   while(*tmp && strncasecmp((const char*)tmp, "boot", 4))
       tmp++;
 
+   if(!*tmp)
+      goto error;
+
+   boot_file = tmp;
+   while(*tmp && *tmp != '\n')
+   {
+      if((*tmp == '\\') || (*tmp == ':'))
+         boot_file = tmp + 1;
+
+      tmp++;
+   }
+
+   tmp = boot_file;
    *game_id++ = toupper(*tmp++);
    *game_id++ = toupper(*tmp++);
    *game_id++ = toupper(*tmp++);
    *game_id++ = toupper(*tmp++);
    *game_id++ = '-';
-   tmp++;
-   *game_id++ = *tmp++;
-   *game_id++ = *tmp++;
-   *game_id++ = *tmp++;
-   tmp++;
-   *game_id++ = *tmp++;
-   *game_id++ = *tmp++;
+
+   if(!isalnum(*tmp))
+      tmp++;
+
+   while(isalnum(*tmp))
+   {
+      *game_id++ = *tmp++;
+      if(*tmp == '.')
+         tmp++;
+   }
+
    *game_id = 0;
 
    filestream_close(fp);
    return 1;
+
+error:
+   filestream_close(fp);
+   return 0;
 }
 
 int detect_ps1_game(const char *track_path, char *game_id)
@@ -348,6 +366,7 @@ int detect_system(const char *track_path, int32_t offset,
 
    RARCH_LOG("Could not find compatible system\n");
    rv = -EINVAL;
+
 clean:
    filestream_close(fd);
    return rv;

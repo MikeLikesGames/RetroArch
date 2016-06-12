@@ -77,7 +77,7 @@ static dylib_t lib_handle;
 #define SYMBOL_IMAGEVIEWER(x) current_core->x = libretro_imageviewer_##x
 #endif
 
-#if defined(HAVE_NETWORK_GAMEPAD) && defined(HAVE_NETPLAY)
+#if defined(HAVE_NETWORKGAMEPAD) && defined(HAVE_NETPLAY)
 #define SYMBOL_NETRETROPAD(x) current_core->x = libretro_netretropad_##x
 #endif
 
@@ -507,7 +507,7 @@ static void load_symbols(enum rarch_core_type type, struct retro_core_t *current
 #endif
          break;
       case CORE_TYPE_NETRETROPAD:
-#if defined(HAVE_NETWORK_GAMEPAD) && defined(HAVE_NETPLAY)
+#if defined(HAVE_NETWORKGAMEPAD) && defined(HAVE_NETPLAY)
          SYMBOL_NETRETROPAD(retro_init);
          SYMBOL_NETRETROPAD(retro_deinit);
 
@@ -867,7 +867,8 @@ bool rarch_environment_cb(unsigned cmd, void *data)
          if (string_is_empty(settings->directory.system))
          {
             char *fullpath = NULL;
-            if (runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath))
+            if (runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath) &&
+                  fullpath)
             {
                RARCH_WARN("SYSTEM DIR is empty, assume CONTENT DIR %s\n",
                      fullpath);
@@ -900,9 +901,11 @@ bool rarch_environment_cb(unsigned cmd, void *data)
          break;
 
       case RETRO_ENVIRONMENT_GET_LANGUAGE:
+#ifdef HAVE_LANGEXTRA
          *(unsigned *)data = settings->user_language;
          RARCH_LOG("Environ GET_LANGUAGE: \"%u\".\n",
                settings->user_language);
+#endif
          break;
 
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
@@ -1362,68 +1365,76 @@ bool rarch_environment_cb(unsigned cmd, void *data)
       
       case RETRO_ENVIRONMENT_SET_MEMORY_MAPS:
       {
-         unsigned i;
-         struct retro_memory_descriptor *descriptors;
-         const struct retro_memory_map *mmaps =
-            (const struct retro_memory_map*)data;
-         
-         free((void*)system->mmaps.descriptors);
-         system->mmaps.num_descriptors = 0;
-         
-         descriptors = (struct retro_memory_descriptor*)
-            calloc(mmaps->num_descriptors, sizeof(*system->mmaps.descriptors));
-         
-         if (!descriptors)
-            return false;
-         
-         system->mmaps.descriptors = descriptors;
-         memcpy((void*)system->mmaps.descriptors, mmaps->descriptors,
-            mmaps->num_descriptors * sizeof(*system->mmaps.descriptors));
-         system->mmaps.num_descriptors = mmaps->num_descriptors;
-         mmap_preprocess_descriptors(descriptors, mmaps->num_descriptors);
-         
-         RARCH_LOG("Environ SET_MEMORY_MAPS.\n");
-         
-         if (sizeof(void *) == 8)
-            RARCH_LOG("   ndx flags  ptr              offset   start    select   disconn  len      addrspace\n");
-         else
-            RARCH_LOG("   ndx flags  ptr          offset   start    select   disconn  len      addrspace\n");
-         
-         for (i = 0; i < system->mmaps.num_descriptors; i++)
+         if (system)
          {
-            const struct retro_memory_descriptor *desc =
-               &system->mmaps.descriptors[i];
-            char flags[7];
-            
-            flags[0] = 'M';
-            if ((desc->flags & RETRO_MEMDESC_MINSIZE_8) == RETRO_MEMDESC_MINSIZE_8)
-               flags[1] = '8';
-            else if ((desc->flags & RETRO_MEMDESC_MINSIZE_4) == RETRO_MEMDESC_MINSIZE_4)
-               flags[1] = '4';
-            else if ((desc->flags & RETRO_MEMDESC_MINSIZE_2) == RETRO_MEMDESC_MINSIZE_2)
-               flags[1] = '2';
+            unsigned i;
+            const struct retro_memory_map *mmaps        =
+               (const struct retro_memory_map*)data;
+            struct retro_memory_descriptor *descriptors = NULL;
+
+            RARCH_LOG("Environ SET_MEMORY_MAPS.\n");
+            free((void*)system->mmaps.descriptors);
+            system->mmaps.num_descriptors = 0;
+            descriptors = (struct retro_memory_descriptor*)
+               calloc(mmaps->num_descriptors,
+                     sizeof(*system->mmaps.descriptors));
+
+            if (!descriptors)
+               return false;
+
+            system->mmaps.descriptors = descriptors;
+            memcpy((void*)system->mmaps.descriptors, mmaps->descriptors,
+                  mmaps->num_descriptors * sizeof(*system->mmaps.descriptors));
+            system->mmaps.num_descriptors = mmaps->num_descriptors;
+            mmap_preprocess_descriptors(descriptors, mmaps->num_descriptors);
+
+            if (sizeof(void *) == 8)
+               RARCH_LOG("   ndx flags  ptr              offset   start    select   disconn  len      addrspace\n");
             else
-               flags[1] = '1';
-            
-            flags[2] = 'A';
-            if ((desc->flags & RETRO_MEMDESC_ALIGN_8) == RETRO_MEMDESC_ALIGN_8)
-               flags[3] = '8';
-            else if ((desc->flags & RETRO_MEMDESC_ALIGN_4) == RETRO_MEMDESC_ALIGN_4)
-               flags[3] = '4';
-            else if ((desc->flags & RETRO_MEMDESC_ALIGN_2) == RETRO_MEMDESC_ALIGN_2)
-               flags[3] = '2';
-            else
-               flags[3] = '1';
-            
-            flags[4] = (desc->flags & RETRO_MEMDESC_BIGENDIAN) ? 'B' : 'b';
-            flags[5] = (desc->flags & RETRO_MEMDESC_CONST) ? 'C' : 'c';
-            flags[6] = 0;
-            
-            RARCH_LOG("   %03u %s %p %08X %08X %08X %08X %08X %s\n",
-               i + 1, flags, desc->ptr, desc->offset, desc->start,
-               desc->select, desc->disconnect, desc->len,
-               desc->addrspace ? desc->addrspace : "");
+               RARCH_LOG("   ndx flags  ptr          offset   start    select   disconn  len      addrspace\n");
+
+            for (i = 0; i < system->mmaps.num_descriptors; i++)
+            {
+               const struct retro_memory_descriptor *desc =
+                  &system->mmaps.descriptors[i];
+               char flags[7];
+
+               flags[0] = 'M';
+               if ((desc->flags & RETRO_MEMDESC_MINSIZE_8) == RETRO_MEMDESC_MINSIZE_8)
+                  flags[1] = '8';
+               else if ((desc->flags & RETRO_MEMDESC_MINSIZE_4) == RETRO_MEMDESC_MINSIZE_4)
+                  flags[1] = '4';
+               else if ((desc->flags & RETRO_MEMDESC_MINSIZE_2) == RETRO_MEMDESC_MINSIZE_2)
+                  flags[1] = '2';
+               else
+                  flags[1] = '1';
+
+               flags[2] = 'A';
+               if ((desc->flags & RETRO_MEMDESC_ALIGN_8) == RETRO_MEMDESC_ALIGN_8)
+                  flags[3] = '8';
+               else if ((desc->flags & RETRO_MEMDESC_ALIGN_4) == RETRO_MEMDESC_ALIGN_4)
+                  flags[3] = '4';
+               else if ((desc->flags & RETRO_MEMDESC_ALIGN_2) == RETRO_MEMDESC_ALIGN_2)
+                  flags[3] = '2';
+               else
+                  flags[3] = '1';
+
+               flags[4] = (desc->flags & RETRO_MEMDESC_BIGENDIAN) ? 'B' : 'b';
+               flags[5] = (desc->flags & RETRO_MEMDESC_CONST) ? 'C' : 'c';
+               flags[6] = 0;
+
+               RARCH_LOG("   %03u %s %p %08X %08X %08X %08X %08X %s\n",
+                     i + 1, flags, desc->ptr, desc->offset, desc->start,
+                     desc->select, desc->disconnect, desc->len,
+                     desc->addrspace ? desc->addrspace : "");
+            }
          }
+         else
+         {
+            RARCH_WARN("Environ SET_MEMORY_MAPS, but system pointer not initialized..\n");
+         }
+         
+         
          
          break;
       }

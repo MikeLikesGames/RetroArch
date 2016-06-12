@@ -219,9 +219,9 @@ enum frontend_architecture frontend_win32_get_architecture(void)
 static int frontend_win32_parse_drive_list(void *data)
 {
 #ifdef HAVE_MENU
-   size_t i = 0;
-   unsigned drives = GetLogicalDrives();
-   char    drive[] = " :\\";
+   size_t i          = 0;
+   unsigned drives   = GetLogicalDrives();
+   char    drive[]   = " :\\";
    file_list_t *list = (file_list_t*)data;
 
    for (i = 0; i < 32; i++)
@@ -316,5 +316,6 @@ frontend_ctx_driver_t frontend_ctx_win32 = {
    frontend_win32_get_architecture,
    frontend_win32_get_powerstate,
    frontend_win32_parse_drive_list,
+   NULL,                           /* get_mem_total */
    "win32",
 };

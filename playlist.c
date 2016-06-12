@@ -22,6 +22,7 @@
 #include <boolean.h>
 #include <compat/posix_string.h>
 #include <string/stdstring.h>
+#include <streams/file_stream.h>
 
 #include "playlist.h"
 #include "verbosity.h"
@@ -257,12 +258,25 @@ void playlist_push(playlist_t *playlist,
    memmove(playlist->entries + 1, playlist->entries,
          (playlist->cap - 1) * sizeof(playlist_entry_t));
 
-   playlist->entries[0].path      = path      ? strdup(path)      : NULL;
-   playlist->entries[0].label     = label     ? strdup(label)     : NULL;
-   playlist->entries[0].core_path = core_path ? strdup(core_path) : NULL;
-   playlist->entries[0].core_name = core_name ? strdup(core_name) : NULL;
-   playlist->entries[0].db_name   = db_name   ? strdup(db_name)   : NULL;
-   playlist->entries[0].crc32     = crc32     ? strdup(crc32)     : NULL;
+   playlist->entries[0].path      = NULL;
+   playlist->entries[0].label     = NULL;
+   playlist->entries[0].core_path = NULL;
+   playlist->entries[0].core_name = NULL;
+   playlist->entries[0].db_name   = NULL;
+   playlist->entries[0].crc32     = NULL;
+   if (!string_is_empty(path))
+      playlist->entries[0].path   = strdup(path);
+   if (!string_is_empty(label))
+      playlist->entries[0].label  = strdup(label);
+   if (!string_is_empty(core_path))
+      playlist->entries[0].core_path = strdup(core_path);
+   if (!string_is_empty(core_name))
+      playlist->entries[0].core_name = strdup(core_name);
+   if (!string_is_empty(db_name))
+      playlist->entries[0].db_name   = strdup(db_name);
+   if (!string_is_empty(crc32))
+      playlist->entries[0].crc32     = strdup(crc32);
+
    playlist->size++;
 }
 
@@ -365,7 +379,7 @@ static bool playlist_read_file(
    char buf[PLAYLIST_ENTRIES][1024] = {{0}};
    playlist_entry_t *entry  = NULL;
    char *last                       = NULL;
-   FILE *file                       = fopen(path, "r");
+   RFILE *file                      = filestream_open(path, RFILE_MODE_READ_TEXT, -1);
 
    /* If playlist file does not exist,
     * create an empty playlist instead.
@@ -379,7 +393,7 @@ static bool playlist_read_file(
       {
          *buf[i] = '\0';
 
-         if (!fgets(buf[i], sizeof(buf[i]), file))
+         if (!filestream_gets(file, buf[i], sizeof(buf[i])))
             goto end;
 
          last = strrchr(buf[i], '\n');
@@ -406,7 +420,7 @@ static bool playlist_read_file(
    }
 
 end:
-   fclose(file);
+   filestream_close(file);
    return true;
 }
 

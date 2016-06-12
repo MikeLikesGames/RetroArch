@@ -45,6 +45,8 @@
 #include "../../verbosity.h"
 #include "../../tasks/tasks_internal.h"
 
+#include "../../file_path_special.h"
+
 enum
 {
    MUI_TEXTURE_POINTER = 0,
@@ -142,10 +144,13 @@ static const char *mui_texture_path(unsigned id)
    return NULL;
 }
 
-static void mui_context_reset_textures(mui_handle_t *mui,
-      const char *iconpath)
+static void mui_context_reset_textures(mui_handle_t *mui)
 {
    unsigned i;
+   char iconpath[PATH_MAX_LENGTH] = {0};
+
+   fill_pathname_application_special(iconpath, sizeof(iconpath),
+         APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI_ICONS);
 
    for (i = 0; i < MUI_TEXTURE_LAST; i++)
    {
@@ -499,16 +504,14 @@ static void mui_render_label_value(mui_handle_t *mui,
       const char *value, float *pure_white)
 {
    menu_animation_ctx_ticker_t ticker;
-   char label_str[PATH_MAX_LENGTH];
-   char value_str[PATH_MAX_LENGTH];
-   int value_len            = strlen(value);
-   int ticker_limit         = 0;
-   size_t usable_width      = 0;
-   uintptr_t texture_switch = 0;
-   bool do_draw_text        = false;
-   uint32_t hash_value      = 0;
-
-   usable_width = width - (mui->margin * 2);
+   char label_str[PATH_MAX_LENGTH] = {0};
+   char value_str[PATH_MAX_LENGTH] = {0};
+   int value_len                   = strlen(value);
+   int ticker_limit                = 0;
+   uintptr_t texture_switch        = 0;
+   bool do_draw_text               = false;
+   uint32_t hash_value             = 0;
+   size_t usable_width             = width - (mui->margin * 2);
 
    if (value_len * mui->glyph_width > usable_width / 2)
       value_len = (usable_width/2) / mui->glyph_width;
@@ -690,10 +693,13 @@ static int mui_get_core_title(char *s, size_t len)
 
    if (runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &info))
    {
-      if (string_is_empty(core_name))
-         core_name = info->info.library_name;
-      if (!core_version)
-         core_version = info->info.library_version;
+      if (info)
+      {
+         if (string_is_empty(core_name))
+            core_name = info->info.library_name;
+         if (!core_version)
+            core_version = info->info.library_version;
+      }
    }
 
    if (string_is_empty(core_name))
@@ -773,15 +779,15 @@ static void mui_frame(void *data)
    };
    menu_animation_ctx_ticker_t ticker;
    unsigned width, height, ticker_limit, i;
-   char msg[256];
-   char title[256];
-   char title_buf[256];
-   char title_msg[256];
    size_t selection;
    size_t title_margin;
-   uint64_t *frame_count;
    menu_display_ctx_draw_t draw;
    mui_handle_t *mui               = (mui_handle_t*)data;
+   uint64_t *frame_count           = NULL;
+   char msg[256]                   = {0};
+   char title[256]                 = {0};
+   char title_buf[256]             = {0};
+   char title_msg[256]             = {0};
    const uint32_t normal_color     = 0x212121ff;
    const uint32_t hover_color      = 0x212121ff;
    const uint32_t title_color      = 0xffffffff;
@@ -935,10 +941,10 @@ static void mui_frame(void *data)
    /* Title */
    if (mui_get_core_title(title_msg, sizeof(title_msg)) == 0)
    {
-      char title_buf_msg_tmp[256];
-      char title_buf_msg[256];
-      size_t usable_width = width - (mui->margin * 2);
       int ticker_limit, value_len;
+      char title_buf_msg_tmp[256] = {0};
+      char title_buf_msg[256]     = {0};
+      size_t         usable_width = width - (mui->margin * 2);
       
       snprintf(title_buf_msg, sizeof(title_buf), "%s (%s)",
             title_buf, title_msg);
@@ -996,26 +1002,6 @@ static void mui_frame(void *data)
    menu_display_unset_viewport();
 }
 
-static void mui_font(void)
-{
-   menu_display_ctx_font_t font_info;
-   char mediapath[PATH_MAX_LENGTH] = {0};
-   char fontpath[PATH_MAX_LENGTH]  = {0};
-   settings_t            *settings = config_get_ptr();
-   int                   font_size = menu_display_get_font_size();
-
-   fill_pathname_join(mediapath, settings->directory.assets,
-         "glui", sizeof(mediapath));
-   fill_pathname_join(fontpath, mediapath,
-         "Roboto-Regular.ttf", sizeof(fontpath));
-
-   font_info.path = fontpath;
-   font_info.size = font_size;
-
-   if (!menu_display_font_main_init(&font_info))
-      RARCH_WARN("Failed to load font.");
-}
-
 static void mui_layout(mui_handle_t *mui)
 {
    void *fb_buf;
@@ -1049,7 +1035,7 @@ static void mui_layout(mui_handle_t *mui)
    /* we assume the average glyph aspect ratio is close to 3:4 */
    mui->glyph_width = new_font_size * 3/4;
 
-   mui_font();
+   menu_display_font(APPLICATION_SPECIAL_DIRECTORY_ASSETS_MATERIALUI_FONT);
 
    fb_buf = menu_display_get_font_buffer();
 
@@ -1231,24 +1217,17 @@ static void mui_populate_entries(
 
 static void mui_context_reset(void *data)
 {
-   char iconpath[PATH_MAX_LENGTH] = {0};
    mui_handle_t *mui              = (mui_handle_t*)data;
    settings_t *settings           = config_get_ptr();
 
    if (!mui || !settings)
       return;
 
-   fill_pathname_join(
-         iconpath,
-         settings->directory.assets,
-         "glui",
-         sizeof(iconpath));
-   fill_pathname_slash(iconpath, sizeof(iconpath));
 
    mui_layout(mui);
    mui_context_bg_destroy(mui);
    menu_display_allocate_white_texture();
-   mui_context_reset_textures(mui, iconpath);
+   mui_context_reset_textures(mui);
 
    task_push_image_load(settings->path.menu_wallpaper, "cb_menu_wallpaper",
          menu_display_handle_wallpaper_upload, NULL);

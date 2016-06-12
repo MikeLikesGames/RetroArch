@@ -51,6 +51,7 @@
 #include "dynamic.h"
 #include "msg_hash.h"
 #include "movie.h"
+#include "file_path_special.h"
 #include "verbosity.h"
 
 #include "frontend/frontend_driver.h"
@@ -391,27 +392,14 @@ static void retroarch_set_special_paths(char **argv, unsigned num_content)
    }
 }
 
-const char *retroarch_get_current_savefile_dir(void)
+static void retroarch_set_paths_redirect(void)
 {
-   char *ret = current_savefile_dir;
-
-   /* try to infer the path in case it's still empty by calling
-   set_paths_redirect */
-   if (string_is_empty(ret))
-      rarch_ctl(RARCH_CTL_SET_PATHS_REDIRECT, NULL);
-   RARCH_LOG("Environ SAVE_DIRECTORY: \"%s\".\n", ret);
-
-   return ret;
-}
-
-static void retroarch_set_paths_redirect(const char *path)
-{
-   char current_savestate_dir[PATH_MAX_LENGTH];
-   uint32_t global_library_name_hash   = 0;
-   bool check_global_library_name_hash = false;
-   global_t                *global     = global_get_ptr();
-   settings_t              *settings   = config_get_ptr();
-   rarch_system_info_t      *info      = NULL;
+   char current_savestate_dir[PATH_MAX_LENGTH] = {0};
+   uint32_t global_library_name_hash           = 0;
+   bool check_global_library_name_hash         = false;
+   global_t                *global             = global_get_ptr();
+   settings_t              *settings           = config_get_ptr();
+   rarch_system_info_t      *info              = NULL;
 
    runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &info);
 
@@ -543,6 +531,19 @@ static void retroarch_set_paths_redirect(const char *path)
             global->name.cheatfile);
    }
 }
+
+const char *retroarch_get_current_savefile_dir(void)
+{
+   char *ret = current_savefile_dir;
+
+   /* try to infer the path in case it's still empty by calling
+   set_paths_redirect */
+   if (string_is_empty(ret) && !content_does_not_need_content())
+      retroarch_set_paths_redirect();
+
+   return ret;
+}
+
 
 enum rarch_content_type retroarch_path_is_media_type(const char *path)
 {
@@ -1183,7 +1184,6 @@ bool retroarch_validate_game_options(char *s, size_t len, bool mkdir)
    const char *game_name                  = NULL;
    rarch_system_info_t *system            = NULL;
    global_t *global                       = global_get_ptr();
-   settings_t *settings                   = config_get_ptr();
 
    runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
 
@@ -1195,17 +1195,8 @@ bool retroarch_validate_game_options(char *s, size_t len, bool mkdir)
    if (string_is_empty(core_name) || string_is_empty(game_name))
       return false;
 
-   /* Config directory: config_directory.
-   * Try config directory setting first,
-   * fallback to the location of the current configuration file. */
-   if (!string_is_empty(settings->directory.menu_config))
-      strlcpy(config_directory,
-            settings->directory.menu_config, sizeof(config_directory));
-   else if (!string_is_empty(global->path.config))
-      fill_pathname_basedir(config_directory,
-            global->path.config, sizeof(config_directory));
-   else
-      return false;
+   fill_pathname_application_special(config_directory, sizeof(config_directory),
+         APPLICATION_SPECIAL_DIRECTORY_CONFIG);
 
    /* Concatenate strings into full paths for game_path */
    fill_pathname_join(s,
@@ -1373,7 +1364,6 @@ bool rarch_ctl(enum rarch_ctl_state state, void *data)
    static bool rarch_error_on_init         = false;
    static bool rarch_block_config_read     = false;
    static bool rarch_force_fullscreen      = false;
-   global_t *global                        = global_get_ptr();
    settings_t *settings                    = config_get_ptr();
 
    switch(state)
@@ -1463,16 +1453,18 @@ bool rarch_ctl(enum rarch_ctl_state state, void *data)
          runloop_ctl(RUNLOOP_CTL_MSG_QUEUE_INIT, NULL);
          break;
       case RARCH_CTL_SET_PATHS_REDIRECT:
-         if(settings->sort_savestates_enable || settings->sort_savefiles_enable)
-         {
-            if (content_does_not_need_content())
-               return false;
-            retroarch_set_paths_redirect(global->name.base);
-         }
+         if (content_does_not_need_content())
+            return false;
+         retroarch_set_paths_redirect();
          break;
       case RARCH_CTL_SET_SRAM_ENABLE:
-         global->sram.use = rarch_ctl(RARCH_CTL_IS_PLAIN_CORE, NULL)
-            && !content_does_not_need_content();
+         {
+            global_t *global                        = global_get_ptr();
+
+            if (global)
+               global->sram.use = rarch_ctl(RARCH_CTL_IS_PLAIN_CORE, NULL)
+                  && !content_does_not_need_content();
+         }
          break;
       case RARCH_CTL_SET_ERROR_ON_INIT:
          rarch_error_on_init = true;
@@ -1540,7 +1532,7 @@ void retroarch_set_pathnames(const char *path)
    fill_pathname_noext(global->name.cheatfile, global->name.base,
          ".cht", sizeof(global->name.cheatfile));
 
-   retroarch_set_paths_redirect(path);
+   retroarch_set_paths_redirect();
 }
 
 void retroarch_fill_pathnames(void)

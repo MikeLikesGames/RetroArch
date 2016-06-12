@@ -14,25 +14,30 @@
  */
 
 #include <retro_miscellaneous.h>
+#include <string/stdstring.h>
 
 #include "../../frontend/frontend_driver.h"
 #include "../../general.h"
 #include "../../verbosity.h"
 #include "win32_common.h"
+#include "../../driver.h"
+#include "../../runloop.h"
+#include "../../tasks/tasks_internal.h"
+#include "../../core_info.h"
 
 #if !defined(_XBOX)
 
 #define IDI_ICON 1
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0500 //_WIN32_WINNT_WIN2K
+#define _WIN32_WINNT 0x0500 /*_WIN32_WINNT_WIN2K */
 #endif
 
 #include <windows.h>
 #include <commdlg.h>
 #include "../../retroarch.h"
 #include "../video_thread_wrapper.h"
-
+#include <Shellapi.h>
 #ifndef _MSC_VER
 extern "C" {
 #endif
@@ -44,12 +49,6 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam);
 #endif
 
 extern "C" bool dinput_handle_message(void *dinput, UINT message, WPARAM wParam, LPARAM lParam);
-extern "C" bool win32_browser(
-      HWND owner,
-      char *filename,
-      const char *extensions,
-      const char *title,
-      const char *initial_dir);
 
 unsigned g_resize_width;
 unsigned g_resize_height;
@@ -59,7 +58,7 @@ static unsigned g_pos_y = CW_USEDEFAULT;
 static bool g_resized;
 bool g_inited;
 static bool g_quit;
-static HWND g_hwnd;
+ui_window_win32_t main_window;
 
 extern void *dinput_wgl;
 static void *curD3D = NULL;
@@ -77,6 +76,74 @@ static HMONITOR win32_monitor_last;
 static unsigned win32_monitor_count;
 static HMONITOR win32_monitor_all[MAX_MONITORS];
 
+INT_PTR CALLBACK PickCoreProc(HWND hDlg, UINT message, 
+        WPARAM wParam, LPARAM lParam)
+{
+   size_t list_size;
+   core_info_list_t *core_info_list = NULL;
+   const core_info_t *core_info     = NULL;
+   char *fullpath                   = NULL;
+
+   switch (message)
+   {
+      case WM_INITDIALOG:
+         {
+            HWND hwndList;
+            unsigned i;
+            /* Add items to list.  */
+
+            runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath);
+            core_info_get_list(&core_info_list);
+            core_info_list_get_supported_cores(core_info_list,
+                  (const char*)fullpath, &core_info, &list_size);
+
+            hwndList = GetDlgItem(hDlg, ID_CORELISTBOX);  
+
+            for (i = 0; i < list_size; i++)
+            {
+               const core_info_t *info = (const core_info_t*)&core_info[i];
+               SendMessage(hwndList, LB_ADDSTRING, 0, 
+                     (LPARAM)info->display_name); 
+            }
+            SetFocus(hwndList); 
+            return TRUE;  
+         }
+
+      case WM_COMMAND:
+         switch (LOWORD(wParam))
+         {
+            case IDOK:
+            case IDCANCEL:
+               EndDialog(hDlg, LOWORD(wParam));
+               return FALSE;
+
+            case ID_CORELISTBOX:
+               {
+                  switch (HIWORD(wParam)) 
+                  { 
+                     case LBN_SELCHANGE:
+                        {
+                           int lbItem;
+                           const core_info_t *info = NULL;
+                           runloop_ctl(RUNLOOP_CTL_GET_CONTENT_PATH, &fullpath);
+                           HWND hwndList = GetDlgItem(hDlg, ID_CORELISTBOX); 
+                           lbItem = (int)SendMessage(hwndList, LB_GETCURSEL, 0, 0); 
+                           core_info_get_list(&core_info_list);
+                           core_info_list_get_supported_cores(core_info_list,
+                                 (const char*)fullpath, &core_info, &list_size);
+                           info = (const core_info_t*)&core_info[lbItem];
+                           runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH,info->path);
+                        } 
+                        break;
+                  }
+               }
+               return TRUE;
+         }
+   }
+   return FALSE;
+}
+
+
 static BOOL CALLBACK win32_monitor_enum_proc(HMONITOR hMonitor,
       HDC hdcMonitor, LPRECT lprcMonitor, LPARAM dwData)
 {
@@ -85,12 +152,14 @@ static BOOL CALLBACK win32_monitor_enum_proc(HMONITOR hMonitor,
 }
 
 
-void win32_monitor_from_window(HWND data, bool destroy)
+void win32_monitor_from_window(void)
 {
 #ifndef _XBOX
-   win32_monitor_last = MonitorFromWindow(data, MONITOR_DEFAULTTONEAREST);
-   if (destroy && data)
-      DestroyWindow(data);
+   win32_monitor_last = MonitorFromWindow(main_window.hwnd, MONITOR_DEFAULTTONEAREST);
+   const ui_window_t *window = ui_companion_driver_get_window_ptr();
+
+   if (window)
+      window->destroy(&main_window);
 #endif
 }
 
@@ -113,7 +182,7 @@ void win32_monitor_info(void *data, void *hm_data, unsigned *mon_id)
    HMONITOR *hm_to_use  = (HMONITOR*)hm_data;
 
    if (!win32_monitor_last)
-      win32_monitor_from_window(GetDesktopWindow(), false);
+      win32_monitor_last = MonitorFromWindow(GetDesktopWindow(), MONITOR_DEFAULTTONEAREST);
 
    *hm_to_use = win32_monitor_last;
    fs_monitor = settings->video.monitor_index;
@@ -141,6 +210,90 @@ void win32_monitor_info(void *data, void *hm_data, unsigned *mon_id)
    GetMonitorInfo(*hm_to_use, (MONITORINFO*)mon);
 }
 
+/* Get the count of the files dropped */
+static int win32_drag_query_file(HWND hwnd, WPARAM wparam)
+{
+   char szFilename[1024] = {0};
+
+   if (DragQueryFile((HDROP)wparam, 0xFFFFFFFF, NULL, 0))
+   {
+      /*poll list of current cores */
+      size_t list_size;
+      content_ctx_info_t content_info  = {0};
+      core_info_list_t *core_info_list = NULL;
+      const core_info_t *core_info     = NULL;
+      settings_t *settings             = config_get_ptr();
+
+      DragQueryFile((HDROP)wparam, 0, szFilename, 1024);
+
+      core_info_get_list(&core_info_list);
+      core_info_list_get_supported_cores(core_info_list,
+            (const char*)szFilename, &core_info, &list_size);
+
+      runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH,szFilename);
+
+      if (!string_is_empty(settings->path.libretro))
+      {
+         unsigned i;
+         core_info_t *current_core = NULL;
+         core_info_get_current_core(&current_core);
+
+         /*we already have path for libretro core */
+         for (i = 0; i < list_size; i++)
+         {
+            const core_info_t *info = (const core_info_t*)&core_info[i];
+
+            if(strcmp(info->systemname, current_core->systemname))
+               break;
+
+            if(!strcmp(settings->path.libretro,info->path))
+            {
+               /* Our previous core supports the current rom */
+               content_ctx_info_t content_info = {0};
+               task_push_content_load_default(
+                     NULL, NULL,
+                     &content_info,
+                     CORE_TYPE_PLAIN,
+                     CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI,
+                     NULL, NULL);
+               DragFinish((HDROP)wparam);
+               return 0;
+            }
+         }
+      }
+
+      /* Poll for cores for current rom since none exist. */
+      if(list_size ==1)
+      {
+         /*pick core that only exists and is bound to work. Ish. */
+         const core_info_t *info = (const core_info_t*)&core_info[0];
+         task_push_content_load_default(
+               info->path, NULL,
+               &content_info,
+               CORE_TYPE_PLAIN,
+               CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI,
+               NULL, NULL);
+      }
+      else
+      {
+         /* Pick one core that could be compatible, ew */
+         if(DialogBoxParam(GetModuleHandle(NULL),MAKEINTRESOURCE(IDD_PICKCORE),
+                  hwnd,PickCoreProc,(LPARAM)NULL)==IDOK) 
+         {
+            task_push_content_load_default(
+                  NULL, NULL,
+                  &content_info,
+                  CORE_TYPE_PLAIN,
+                  CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI,
+                  NULL, NULL);
+         }
+      }
+      DragFinish((HDROP)wparam);
+   }
+
+   return 0;
+}
+
 static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
       WPARAM wparam, LPARAM lparam)
 {
@@ -155,10 +308,11 @@ static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
             case SC_SCREENSAVE:
             case SC_MONITORPOWER:
                *quit = true;
-               return 0;
+               break;
          }
          break;
-
+      case WM_DROPFILES:
+         return win32_drag_query_file(hwnd, wparam);
       case WM_CHAR:
       case WM_KEYDOWN:
       case WM_KEYUP:
@@ -170,15 +324,15 @@ static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
       case WM_CLOSE:
       case WM_DESTROY:
       case WM_QUIT:
-      {
-         WINDOWPLACEMENT placement;
-         GetWindowPlacement(g_hwnd, &placement);
-         g_pos_x = placement.rcNormalPosition.left;
-         g_pos_y = placement.rcNormalPosition.top;
-         g_quit = true;
-         *quit = true;
-         return 0;
-      }
+         {
+            WINDOWPLACEMENT placement;
+            GetWindowPlacement(main_window.hwnd, &placement);
+            g_pos_x = placement.rcNormalPosition.left;
+            g_pos_y = placement.rcNormalPosition.top;
+            g_quit  = true;
+            *quit   = true;
+         }
+         break;
       case WM_SIZE:
          /* Do not send resize message if we minimize. */
          if (wparam != SIZE_MAXHIDE && wparam != SIZE_MINIMIZED)
@@ -188,10 +342,10 @@ static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
             g_resized = true;
          }
          *quit = true;
-         return 0;
+         break;
 	  case WM_COMMAND:
          if (settings->ui.menubar_enable)
-            win32_menu_loop(g_hwnd, wparam);
+            win32_menu_loop(main_window.hwnd, wparam);
          break;
    }
    return 0;
@@ -205,6 +359,7 @@ LRESULT CALLBACK WndProcD3D(HWND hwnd, UINT message,
 
    switch (message)
    {
+      case WM_DROPFILES:
       case WM_SYSCOMMAND:
       case WM_CHAR:
       case WM_KEYDOWN:
@@ -221,9 +376,16 @@ LRESULT CALLBACK WndProcD3D(HWND hwnd, UINT message,
          break;
       case WM_CREATE:
          {
+            ui_window_win32_t win32_window;
+            const ui_window_t *window = ui_companion_driver_get_window_ptr();
             LPCREATESTRUCT p_cs   = (LPCREATESTRUCT)lparam;
             curD3D                = p_cs->lpCreateParams;
             g_inited              = true;
+            
+            win32_window.hwnd     = hwnd;
+
+            if (window)
+               window->set_droppable(&win32_window, true);
          }
          return 0;
    }
@@ -242,6 +404,7 @@ LRESULT CALLBACK WndProcGL(HWND hwnd, UINT message,
 
    switch (message)
    {
+      case WM_DROPFILES:
       case WM_SYSCOMMAND:
       case WM_CHAR:
       case WM_KEYDOWN:
@@ -258,7 +421,16 @@ LRESULT CALLBACK WndProcGL(HWND hwnd, UINT message,
             return ret;
          break;
       case WM_CREATE:
-         create_graphics_context(hwnd, &g_quit);
+         {
+            ui_window_win32_t win32_window;
+            const ui_window_t *window = ui_companion_driver_get_window_ptr();
+            win32_window.hwnd           = hwnd;
+
+            create_graphics_context(hwnd, &g_quit);
+
+            if (window)
+               window->set_droppable(&win32_window, true);
+         }
          return 0;
    }
 
@@ -272,18 +444,18 @@ bool win32_window_create(void *data, unsigned style,
       unsigned height, bool fullscreen)
 {
 #ifndef _XBOX
-   g_hwnd = CreateWindowEx(0, "RetroArch", "RetroArch",
+   main_window.hwnd = CreateWindowEx(0, "RetroArch", "RetroArch",
          style,
          fullscreen ? mon_rect->left : g_pos_x,
          fullscreen ? mon_rect->top  : g_pos_y,
          width, height,
          NULL, NULL, NULL, data);
-   if (!g_hwnd)
+   if (!main_window.hwnd)
       return false;
 
    video_driver_display_type_set(RARCH_DISPLAY_WIN32);
    video_driver_display_set(0);
-   video_driver_window_set((uintptr_t)g_hwnd);
+   video_driver_window_set((uintptr_t)main_window.hwnd);
 #endif
    return true;
 }
@@ -365,13 +537,9 @@ void win32_show_cursor(bool state)
 void win32_check_window(bool *quit, bool *resize, unsigned *width, unsigned *height)
 {
 #ifndef _XBOX
-   MSG msg;
-
-   while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-   {
-      TranslateMessage(&msg);
-      DispatchMessage(&msg);
-   }
+   const ui_application_t *application = ui_companion_driver_get_application_ptr();
+   if (application)
+      application->process_events();
 #endif
    *quit = g_quit;
 
@@ -496,19 +664,23 @@ void win32_set_window(unsigned *width, unsigned *height,
 
    if (!fullscreen || windowed_full)
    {
+      const ui_window_t *window = ui_companion_driver_get_window_ptr();
+
       if (!fullscreen && settings->ui.menubar_enable)
       {
          RECT rc_temp = {0, 0, (LONG)*height, 0x7FFF};
-         SetMenu(g_hwnd, LoadMenu(GetModuleHandle(NULL),MAKEINTRESOURCE(IDR_MENU)));
-         SendMessage(g_hwnd, WM_NCCALCSIZE, FALSE, (LPARAM)&rc_temp);
+         SetMenu(main_window.hwnd, LoadMenu(GetModuleHandle(NULL),MAKEINTRESOURCE(IDR_MENU)));
+         SendMessage(main_window.hwnd, WM_NCCALCSIZE, FALSE, (LPARAM)&rc_temp);
          g_resize_height = *height += rc_temp.top + rect->top;
-         SetWindowPos(g_hwnd, NULL, 0, 0, *width, *height, SWP_NOMOVE);
+         SetWindowPos(main_window.hwnd, NULL, 0, 0, *width, *height, SWP_NOMOVE);
       }
 
-      ShowWindow(g_hwnd, SW_RESTORE);
-      UpdateWindow(g_hwnd);
-      SetForegroundWindow(g_hwnd);
-      SetFocus(g_hwnd);
+      ShowWindow(main_window.hwnd, SW_RESTORE);
+      UpdateWindow(main_window.hwnd);
+      SetForegroundWindow(main_window.hwnd);
+
+      if (window)
+         window->set_focused(&main_window);
    }
 
    win32_show_cursor(!fullscreen);
@@ -546,7 +718,7 @@ bool win32_set_video_mode(void *data,
    win32_set_window(&width, &height, fullscreen, windowed_full, &rect);
 
    /* Wait until context is created (or failed to do so ...) */
-   while (!g_inited && !g_quit && GetMessage(&msg, g_hwnd, 0, 0))
+   while (!g_inited && !g_quit && GetMessage(&msg, main_window.hwnd, 0, 0))
    {
       TranslateMessage(&msg);
       DispatchMessage(&msg);
@@ -562,7 +734,12 @@ bool win32_set_video_mode(void *data,
 #ifdef _XBOX
 static HANDLE GetFocus(void)
 {
-   return g_hwnd;
+   return main_window.hwnd;
+}
+
+static HWND GetForegroundWindow(void)
+{
+   return main_window.hwnd;
 }
 
 BOOL IsIconic(HWND hwnd)
@@ -573,15 +750,24 @@ BOOL IsIconic(HWND hwnd)
 
 bool win32_has_focus(void)
 {
+#ifndef _XBOX
+   const ui_window_t *window = ui_companion_driver_get_window_ptr();
+#endif
    if (!g_inited)
       return false;
 
-   return GetFocus() == g_hwnd;
+#ifdef _XBOX
+   return GetForegroundWindow() == main_window.hwnd;
+#else
+   if (window)
+      return window->focused(&main_window);
+   return false;
+#endif
 }
 
 HWND win32_get_window(void)
 {
-   return g_hwnd;
+   return main_window.hwnd;
 }
 
 void win32_window_reset(void)
@@ -595,5 +781,5 @@ void win32_destroy_window(void)
 #ifndef _XBOX
    UnregisterClass("RetroArch", GetModuleHandle(NULL));
 #endif
-   g_hwnd = NULL;
+   main_window.hwnd = NULL;
 }

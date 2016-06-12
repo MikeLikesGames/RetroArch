@@ -158,9 +158,9 @@ static int iso_get_serial(database_state_handle_t *db_state,
 static int cue_get_serial(database_state_handle_t *db_state,
       database_info_handle_t *db, const char *name, char* serial)
 {
-   char track_path[PATH_MAX_LENGTH];
-   int32_t offset = 0;
-   int rv = find_first_data_track(name, &offset, track_path, PATH_MAX_LENGTH);
+   int32_t offset                   = 0;
+   char track_path[PATH_MAX_LENGTH] = {0};
+   int rv                           = find_first_data_track(name, &offset, track_path, PATH_MAX_LENGTH);
     
    if (rv < 0)
    {
@@ -310,7 +310,8 @@ static int database_info_list_iterate_found_match(
 
    snprintf(db_crc, sizeof(db_crc), "%08X|crc", db_info_entry->crc32);
 
-   strlcpy(entry_path_str, entry_path, sizeof(entry_path_str));
+   if (entry_path)
+      strlcpy(entry_path_str, entry_path, sizeof(entry_path_str));
 
    if (!string_is_empty(zip_name))
       fill_pathname_join_delim(entry_path_str, entry_path_str, zip_name,
@@ -403,8 +404,11 @@ static int task_database_iterate_crc_lookup(
 
    db_state->entry_index++;
 
-   if (db_state->entry_index >= db_state->info->count)
-      return database_info_list_iterate_next(db_state);
+   if (db_state->info)
+   {
+      if (db_state->entry_index >= db_state->info->count)
+         return database_info_list_iterate_next(db_state);
+   }
 
    /* If we haven't reached the end of the database list yet,
     * continue iterating. */
@@ -447,7 +451,7 @@ static int task_database_iterate_serial_lookup(
 
    if (db_state->entry_index == 0)
    {
-      char query[50];
+      char query[50]   = {0};
       char *serial_buf = 
          bin_to_hex_alloc((uint8_t*)db_state->serial, 10 * sizeof(uint8_t));
 
@@ -479,8 +483,11 @@ static int task_database_iterate_serial_lookup(
 
    db_state->entry_index++;
 
-   if (db_state->entry_index >= db_state->info->count)
-      return database_info_list_iterate_next(db_state);
+   if (db_state->info)
+   {
+      if (db_state->entry_index >= db_state->info->count)
+         return database_info_list_iterate_next(db_state);
+   }
 
    /* If we haven't reached the end of the database list yet,
     * continue iterating. */

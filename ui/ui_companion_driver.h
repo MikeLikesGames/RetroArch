@@ -18,8 +18,9 @@
 #define __UI_COMPANION_DRIVER_H
 
 #include <stddef.h>
-#include <boolean.h>
 
+#include <boolean.h>
+#include <retro_common_api.h>
 #include <lists/file_list.h>
 
 #ifdef HAVE_CONFIG_H
@@ -28,9 +29,97 @@
 
 #include "../command.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+RETRO_BEGIN_DECLS
+
+enum ui_msg_window_buttons
+{
+   UI_MSG_WINDOW_OK = 0,
+   UI_MSG_WINDOW_OKCANCEL,
+   UI_MSG_WINDOW_YESNO,
+   UI_MSG_WINDOW_YESNOCANCEL
+};
+
+enum ui_msg_window_response
+{
+   UI_MSG_RESPONSE_NA = 0,
+   UI_MSG_RESPONSE_OK,
+   UI_MSG_RESPONSE_CANCEL,
+   UI_MSG_RESPONSE_YES,
+   UI_MSG_RESPONSE_NO
+};
+
+enum ui_msg_window_type
+{
+    UI_MSG_WINDOW_TYPE_ERROR = 0,
+    UI_MSG_WINDOW_TYPE_INFORMATION,
+    UI_MSG_WINDOW_TYPE_QUESTION,
+    UI_MSG_WINDOW_TYPE_WARNING
+};
+
+typedef struct ui_msg_window_state
+{
+   enum ui_msg_window_buttons buttons;
+   char *text;
+   char *title;
+   void *window;
+} ui_msg_window_state;
+
+typedef struct ui_browser_window_state
+{
+   struct 
+   {
+      bool can_choose_directories;
+      bool can_choose_directories_val;
+      bool can_choose_files;
+      bool can_choose_files_val;
+      bool allows_multiple_selection;
+      bool allows_multiple_selection_val;
+      bool treat_file_packages_as_directories;
+      bool treat_file_packages_as_directories_val;
+   } capabilities;
+   void *window;
+   char *filters;
+   char *filters_title;
+   char *startdir;
+   char *path;
+   char *title;
+   char *result;
+} ui_browser_window_state_t;
+
+typedef struct ui_browser_window
+{
+   bool (*open)(ui_browser_window_state_t *state);
+   bool (*save)(ui_browser_window_state_t *state);
+   const char *ident;
+} ui_browser_window_t;
+
+typedef struct ui_msg_window
+{
+   enum ui_msg_window_response (*error      )(ui_msg_window_state *state);
+   enum ui_msg_window_response (*information)(ui_msg_window_state *state);
+   enum ui_msg_window_response (*question   )(ui_msg_window_state *state);
+   enum ui_msg_window_response (*warning    )(ui_msg_window_state *state);
+   const char *ident;
+} ui_msg_window_t;
+
+typedef struct ui_application
+{
+   bool (*initialize)(void);
+   bool (*pending_events)(void);
+   void (*process_events)(void);
+   const char *ident;
+} ui_application_t;
+
+typedef struct ui_window
+{
+   void (*destroy)(void *data);
+   void (*set_focused)(void *data);
+   void (*set_visible)(void *data, bool visible);
+   void (*set_title)(void *data, char *buf);
+   void (*set_droppable)(void *data, bool droppable);
+   bool (*focused)(void *data);
+   const char *ident;
+} ui_window_t;
 
 typedef struct ui_companion_driver
 {
@@ -44,8 +133,32 @@ typedef struct ui_companion_driver
    void (*notify_refresh)(void *data);
    void (*msg_queue_push)(const char *msg, unsigned priority, unsigned duration, bool flush);
    void (*render_messagebox)(const char *msg);
-   const char *ident;
+   const ui_browser_window_t *browser_window;
+   const ui_msg_window_t     *msg_window;
+   const ui_window_t         *window;
+   const ui_application_t    *application;
+   const char        *ident;
 } ui_companion_driver_t;
+
+extern const ui_browser_window_t   ui_browser_window_null;
+extern const ui_browser_window_t   ui_browser_window_cocoa;
+extern const ui_browser_window_t   ui_browser_window_qt;
+extern const ui_browser_window_t   ui_browser_window_win32;
+
+extern const ui_window_t           ui_window_null;
+extern const ui_window_t           ui_window_cocoa;
+extern const ui_window_t           ui_window_qt;
+extern const ui_window_t           ui_window_win32;
+
+extern const ui_msg_window_t       ui_msg_window_null;
+extern const ui_msg_window_t       ui_msg_window_win32;
+extern const ui_msg_window_t       ui_msg_window_qt;
+extern const ui_msg_window_t       ui_msg_window_cocoa;
+
+extern const ui_application_t      ui_application_null;
+extern const ui_application_t      ui_application_cocoa;
+extern const ui_application_t      ui_application_qt;
+extern const ui_application_t      ui_application_win32;
 
 extern const ui_companion_driver_t ui_companion_null;
 extern const ui_companion_driver_t ui_companion_cocoa;
@@ -94,8 +207,14 @@ void ui_companion_driver_toggle(void);
 
 void ui_companion_driver_free(void);
 
-#ifdef __cplusplus
-}
-#endif
+const ui_msg_window_t *ui_companion_driver_get_msg_window_ptr(void);
+
+const ui_browser_window_t *ui_companion_driver_get_browser_window_ptr(void);
+
+const ui_window_t *ui_companion_driver_get_window_ptr(void);
+
+const ui_application_t *ui_companion_driver_get_application_ptr(void);
+
+RETRO_END_DECLS
 
 #endif
