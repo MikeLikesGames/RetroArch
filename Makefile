@@ -1,4 +1,5 @@
 HAVE_FILE_LOGGER=1
+NEED_CXX_LINKER=0
 MISSING_DECLS   =0
 
 ifneq ($(C90_BUILD),)
@@ -33,7 +34,7 @@ endif
 HEADERS = $(wildcard */*/*.h) $(wildcard */*.h) $(wildcard *.h)
 
 ifeq ($(MISSING_DECLS), 1)
-	DEFINES += -Werror=missing-declarations
+   DEFINES += -Werror=missing-declarations
 endif
 
 ifeq ($(HAVE_DYLIB), 1)
@@ -68,10 +69,12 @@ OBJCFLAGS :=  $(CFLAGS) -D__STDC_CONSTANT_MACROS
 ifeq ($(CXX_BUILD), 1)
    LINK = $(CXX)
    CFLAGS   := $(CXXFLAGS) -xc++
-	CFLAGS   += -DCXX_BUILD
-	CXXFLAGS += -DCXX_BUILD
+   CFLAGS   += -DCXX_BUILD
+   CXXFLAGS += -DCXX_BUILD
 else
-   ifeq ($(findstring Win32,$(OS)),)
+   ifeq ($(NEED_CXX_LINKER),1)
+      LINK = $(CXX)
+   else ifeq ($(findstring Win32,$(OS)),)
       LINK = $(CC)
    else
       # directx-related code is c++
@@ -117,10 +120,14 @@ endif
 
 all: $(TARGET) config.mk
 
+ifeq ($(MAKECMDGOALS),clean)
+config.mk:
+else
 -include $(RARCH_OBJ:.o=.d)
 config.mk: configure qb/*
 	@echo "config.mk is outdated or non-existing. Run ./configure again."
 	@exit 1
+endif
 
 retroarch: $(RARCH_OBJ)
 	@$(if $(Q), $(shell echo echo LD $@),)
@@ -129,12 +136,12 @@ retroarch: $(RARCH_OBJ)
 $(OBJDIR)/%.o: %.c config.h config.mk
 	@mkdir -p $(dir $@)
 	@$(if $(Q), $(shell echo echo CC $<),)
-	$(Q)$(CC) $(CFLAGS) $(DEFINES) -MMD -c -o $@ $<
+	$(Q)$(CC) $(CPPFLAGS) $(CFLAGS) $(DEFINES) -MMD -c -o $@ $<
 
 $(OBJDIR)/%.o: %.cpp config.h config.mk
 	@mkdir -p $(dir $@)
 	@$(if $(Q), $(shell echo echo CXX $<),)
-	$(Q)$(CXX) $(CXXFLAGS) $(DEFINES) -MMD -c -o $@ $<
+	$(Q)$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(DEFINES) -MMD -c -o $@ $<
 
 $(OBJDIR)/%.o: %.m
 	@mkdir -p $(dir $@)

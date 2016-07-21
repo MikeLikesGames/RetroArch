@@ -24,8 +24,10 @@
 #include <rthreads/rthreads.h>
 #endif
 
+#include <retro_common_api.h>
 #include <file/config_file.h>
 #include <features/features_cpu.h>
+#include <file/file_path.h>
 
 #include "video_thread_wrapper.h"
 #include "../frontend/frontend_driver.h"
@@ -42,7 +44,6 @@
 #include "../msg_hash.h"
 
 #ifdef HAVE_MENU
-#include "../menu/menu_hash.h"
 #include "../menu/menu_setting.h"
 #endif
 
@@ -53,12 +54,6 @@
 #define TIME_TO_FPS(last_time, new_time, frames) ((1000000.0f * (frames)) / ((new_time) - (last_time)))
 
 #define FPS_UPDATE_INTERVAL 256
-
-#ifdef _WIN32
-#define U64_SIGN "%I64u"
-#else
-#define U64_SIGN "%llu"
-#endif
 
 typedef struct video_driver_state
 {
@@ -204,6 +199,9 @@ static const video_driver_t *video_drivers[] = {
 #endif
 #ifdef HAVE_SUNXI
    &video_sunxi,
+#endif
+#ifdef HAVE_PLAIN_DRM
+   &video_drm,
 #endif
    &video_null,
    NULL,
@@ -1005,20 +1003,21 @@ bool video_monitor_get_fps(char *buf, size_t size,
          last_fps = TIME_TO_FPS(curr_time, new_time, FPS_UPDATE_INTERVAL);
          curr_time = new_time;
 
-         strlcpy(buf, video_driver_title_buf, size);
-         strlcat(buf, " || ", size);
+         fill_pathname_noext(buf,
+               video_driver_title_buf,
+               " || ",
+               size);
 
          if (settings->fps_show)
          {
             char fps_text[64];
-            snprintf(fps_text, sizeof(fps_text), " FPS: %6.1f", last_fps);
+            snprintf(fps_text, sizeof(fps_text), " FPS: %6.1f || ", last_fps);
             strlcat(buf, fps_text, size);
-            strlcat(buf, " || ", size);
          }
 
          strlcat(buf, "Frames: ", size);
 
-         snprintf(frames_text, sizeof(frames_text), U64_SIGN,
+         snprintf(frames_text, sizeof(frames_text), STRING_REP_UINT64,
                (unsigned long long)video_driver_frame_count);
 
          strlcat(buf, frames_text, size);
@@ -1026,8 +1025,10 @@ bool video_monitor_get_fps(char *buf, size_t size,
       }
 
       if (buf_fps && settings->fps_show)
-         snprintf(buf_fps, size_fps, "FPS: %6.1f || Frames: " U64_SIGN,
-               last_fps, (unsigned long long)video_driver_frame_count);
+         snprintf(buf_fps, size_fps, "FPS: %6.1f || %s: " STRING_REP_UINT64,
+               last_fps,
+               msg_hash_to_str(MSG_FRAMES),
+               (unsigned long long)video_driver_frame_count);
 
       return ret;
    }
@@ -1035,7 +1036,7 @@ bool video_monitor_get_fps(char *buf, size_t size,
    curr_time = fps_time = new_time;
    strlcpy(buf, video_driver_title_buf, size);
    if (buf_fps)
-      strlcpy(buf_fps, "N/A", size_fps);
+      strlcpy(buf_fps, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), size_fps);
 
    return true;
 }
@@ -1186,33 +1187,36 @@ void video_driver_menu_settings(void **list_data, void *list_info_data,
 #if defined(GEKKO) || defined(__CELLOS_LV2__)
    CONFIG_ACTION(
          list, list_info,
-         menu_hash_to_str(MENU_LABEL_SCREEN_RESOLUTION),
-         menu_hash_to_str(MENU_LABEL_VALUE_SCREEN_RESOLUTION),
+         msg_hash_to_str(MENU_ENUM_LABEL_SCREEN_RESOLUTION),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_SCREEN_RESOLUTION),
          group_info,
          subgroup_info,
          parent_group);
+   menu_settings_list_current_add_enum_idx(list, list_info, MENU_ENUM_LABEL_SCREEN_RESOLUTION);
 #endif
 #if defined(__CELLOS_LV2__)
    CONFIG_BOOL(
          list, list_info,
          &global->console.screen.pal60_enable,
-         menu_hash_to_str(MENU_LABEL_PAL60_ENABLE),
-         menu_hash_to_str(MENU_LABEL_VALUE_PAL60_ENABLE),
+         msg_hash_to_str(MENU_ENUM_LABEL_PAL60_ENABLE),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_PAL60_ENABLE),
          false,
-         menu_hash_to_str(MENU_VALUE_OFF),
-         menu_hash_to_str(MENU_VALUE_ON),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON),
          group_info,
          subgroup_info,
          parent_group,
          general_write_handler,
-         general_read_handler);
+         general_read_handler,
+         SD_FLAG_NONE);
+   menu_settings_list_current_add_enum_idx(list, list_info, MENU_ENUM_LABEL_PAL60_ENABLE);
 #endif
 #if defined(GEKKO) || defined(_XBOX360)
    CONFIG_UINT(
          list, list_info,
          &global->console.screen.gamma_correction,
-         menu_hash_to_str(MENU_LABEL_VIDEO_GAMMA),
-         menu_hash_to_str(MENU_LABEL_VALUE_VIDEO_GAMMA),
+         msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_GAMMA),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_GAMMA),
          0,
          group_info,
          subgroup_info,
@@ -1233,32 +1237,35 @@ void video_driver_menu_settings(void **list_data, void *list_info_data,
          true);
    settings_data_list_current_add_flags(list, list_info,
          SD_FLAG_CMD_APPLY_AUTO|SD_FLAG_ADVANCED);
+   menu_settings_list_current_add_enum_idx(list, list_info, MENU_ENUM_LABEL_VIDEO_GAMMA);
 #endif
 #if defined(_XBOX1) || defined(HW_RVL)
    CONFIG_BOOL(
          list, list_info,
          &global->console.softfilter_enable,
-         menu_hash_to_str(MENU_LABEL_VIDEO_SOFT_FILTER),
-         menu_hash_to_str(MENU_LABEL_VALUE_VIDEO_SOFT_FILTER),
+         msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_SOFT_FILTER),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_SOFT_FILTER),
          false,
-         menu_hash_to_str(MENU_VALUE_OFF),
-         menu_hash_to_str(MENU_VALUE_ON),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON),
          group_info,
          subgroup_info,
          parent_group,
          general_write_handler,
-         general_read_handler);
+         general_read_handler,
+         SD_FLAG_NONE);
    menu_settings_list_current_add_cmd(
          list,
          list_info,
          CMD_EVENT_VIDEO_APPLY_STATE_CHANGES);
+   menu_settings_list_current_add_enum_idx(list, list_info, MENU_ENUM_LABEL_VIDEO_SOFT_FILTER);
 #endif
 #ifdef _XBOX1
    CONFIG_UINT(
          list, list_info,
          &settings->video.swap_interval,
-         menu_hash_to_str(MENU_LABEL_VIDEO_FILTER_FLICKER),
-         menu_hash_to_str(MENU_LABEL_VALUE_VIDEO_FILTER_FLICKER),
+         msg_hash_to_str(MENU_ENUM_LABEL_VIDEO_FILTER_FLICKER),
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_VIDEO_FILTER_FLICKER),
          0,
          group_info,
          subgroup_info,
@@ -1266,6 +1273,7 @@ void video_driver_menu_settings(void **list_data, void *list_info_data,
          general_write_handler,
          general_read_handler);
    menu_settings_list_current_add_range(list, list_info, 0, 5, 1, true, true);
+   menu_settings_list_current_add_enum_idx(list, list_info, MENU_ENUM_LABEL_VIDEO_FILTER_FLICKER);
 #endif
 #endif
 }
@@ -1277,6 +1285,8 @@ void video_driver_menu_settings(void **list_data, void *list_info_data,
  * used for GLES.
  * TODO: Refactor this better. */
 static struct retro_hw_render_callback hw_render;
+static const struct retro_hw_render_context_negotiation_interface *hw_render_context_negotiation;
+
 static bool video_driver_use_rgba                = false;
 static bool video_driver_data_own                = false;
 static bool video_driver_active                  = false;
@@ -1814,11 +1824,22 @@ void video_driver_deinit_hw_context(void)
       hw_render.context_destroy();
 
    memset(&hw_render, 0, sizeof(hw_render));
+   hw_render_context_negotiation = NULL;
 }
 
 struct retro_hw_render_callback *video_driver_get_hw_context(void)
 {
    return &hw_render;
+}
+
+const struct retro_hw_render_context_negotiation_interface *video_driver_get_context_negotiation_interface(void)
+{
+   return hw_render_context_negotiation;
+}
+
+void video_driver_set_context_negotiation_interface(const struct retro_hw_render_context_negotiation_interface *iface)
+{
+   hw_render_context_negotiation = iface;
 }
 
 void video_driver_set_video_cache_context(void)
@@ -1928,11 +1949,11 @@ void video_driver_set_title_buf(void)
 {
    struct retro_system_info info;
    core_get_system_info(&info);
-   strlcpy(video_driver_title_buf, 
+
+   fill_pathname_noext(video_driver_title_buf, 
          msg_hash_to_str(MSG_PROGRAM),
+         " ",
          sizeof(video_driver_title_buf));
-   strlcat(video_driver_title_buf,
-         " ", sizeof(video_driver_title_buf));
    strlcat(video_driver_title_buf, 
          info.library_name,
          sizeof(video_driver_title_buf));

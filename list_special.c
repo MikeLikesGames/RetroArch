@@ -17,11 +17,11 @@
 #include <string.h>
 
 #include <lists/dir_list.h>
+#include <lists/string_list.h>
 #include <compat/strl.h>
 
 #include "list_special.h"
 #include "frontend/frontend_driver.h"
-#include "configuration.h"
 #include "core_info.h"
 
 #ifdef HAVE_MENU
@@ -48,17 +48,13 @@
 struct string_list *dir_list_new_special(const char *input_dir,
       enum dir_list_type type, const char *filter)
 {
-   char ext_shaders[PATH_MAX_LENGTH];
-   char ext_name[PATH_MAX_LENGTH];
-   const char *dir   = NULL;
-   const char *exts  = NULL;
-   bool include_dirs = false;
-
-   settings_t *settings = config_get_ptr();
+   char ext_shaders[PATH_MAX_LENGTH] = {0};
+   char ext_name[PATH_MAX_LENGTH]    = {0};
+   const char *dir                   = NULL;
+   const char *exts                  = NULL;
+   bool include_dirs                 = false;
 
    (void)input_dir;
-   (void)settings;
-   ext_shaders[0] = '\0';
 
    switch (type)
    {
@@ -67,7 +63,7 @@ struct string_list *dir_list_new_special(const char *input_dir,
          exts = filter;
          break;
       case DIR_LIST_CORES:
-         dir  = settings->directory.libretro;
+         dir  = input_dir;
 
          if (!frontend_driver_get_core_extension(ext_name, sizeof(ext_name)))
             return NULL;
@@ -84,24 +80,37 @@ struct string_list *dir_list_new_special(const char *input_dir,
          }
          break;
       case DIR_LIST_SHADERS:
-         dir  = settings->directory.video_shader;
+         {
+            union string_list_elem_attr attr = {0};
+            struct string_list *str_list     = string_list_new();
+
+            if (!str_list)
+               return NULL;
+
+            dir  = input_dir;
 #ifdef HAVE_CG
-         strlcat(ext_shaders, "cg|cgp", sizeof(ext_shaders));
+            string_list_append(str_list, "cg", attr);
+            string_list_append(str_list, "cgp", attr);
 #endif
 #ifdef HAVE_GLSL
-         strlcat(ext_shaders, "glsl|glslp", sizeof(ext_shaders));
+            string_list_append(str_list, "glsl", attr);
+            string_list_append(str_list, "glslp", attr);
 #endif
 #ifdef HAVE_VULKAN
-         strlcat(ext_shaders, "slang|slangp", sizeof(ext_shaders));
+            string_list_append(str_list, "slang", attr);
+            string_list_append(str_list, "slangp", attr);
 #endif
-         exts = ext_shaders;
+            string_list_join_concat(ext_shaders, sizeof(ext_shaders), str_list, "|");
+            string_list_free(str_list);
+            exts = ext_shaders;
+         }
          break;
       case DIR_LIST_COLLECTIONS:
-         dir  = settings->directory.playlist;
+         dir  = input_dir;
          exts = "lpl";
          break;
       case DIR_LIST_DATABASES:
-         dir  = settings->path.content_database;
+         dir  = input_dir;
          exts = "rdb";
          break;
       case DIR_LIST_PLAIN:
@@ -267,13 +276,8 @@ struct string_list *string_list_new_special(enum string_list_type type,
 
          for (i = 0; i < *list_size; i++)
          {
-            const char          *opt = NULL;
-            core_info_t *info        = (core_info_t*)&core_info[i];
-            
-            if (!info)
-               goto error;
-            
-            opt = info->display_name;
+            core_info_t *info = (core_info_t*)&core_info[i];
+            const char  *opt  = info->display_name;
 
             if (!opt)
                goto error;

@@ -228,8 +228,8 @@ static int frontend_win32_parse_drive_list(void *data)
    {
       drive[0] = 'A' + i;
       if (drives & (1 << i))
-         menu_entries_add(list,
-               drive, "", MENU_FILE_DIRECTORY, 0, 0);
+         menu_entries_append_enum(list,
+               drive, "", MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
    }
 #endif
 
@@ -297,7 +297,22 @@ static void frontend_win32_environment_get(int *argc, char *argv[],
    snprintf(g_defaults.settings.menu, sizeof(g_defaults.settings.menu), "xmb");
 #endif
 #endif
+}
 
+static uint64_t frontend_win32_get_mem_total(void)
+{
+	MEMORYSTATUSEX mem_info;
+	mem_info.dwLength = sizeof(MEMORYSTATUSEX);
+	GlobalMemoryStatusEx(&mem_info);
+	return mem_info.ullTotalPhys;
+}
+
+static uint64_t frontend_win32_get_mem_used(void)
+{
+	MEMORYSTATUSEX mem_info;
+	mem_info.dwLength = sizeof(MEMORYSTATUSEX);
+	GlobalMemoryStatusEx(&mem_info);
+	return ((frontend_win32_get_mem_total() - mem_info.ullAvailPhys));
 }
 
 frontend_ctx_driver_t frontend_ctx_win32 = {
@@ -316,6 +331,11 @@ frontend_ctx_driver_t frontend_ctx_win32 = {
    frontend_win32_get_architecture,
    frontend_win32_get_powerstate,
    frontend_win32_parse_drive_list,
-   NULL,                           /* get_mem_total */
-   "win32",
+   frontend_win32_get_mem_total,
+   frontend_win32_get_mem_used,
+   NULL,                            /* install_signal_handler */
+   NULL,                            /* get_sighandler_state */
+   NULL,                            /* set_sighandler_state */
+   NULL,                            /* destroy_sighandler_state */
+   "win32"
 };

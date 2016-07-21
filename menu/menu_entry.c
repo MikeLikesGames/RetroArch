@@ -16,6 +16,7 @@
 
 #include <compat/strl.h>
 #include <lists/string_list.h>
+#include <string/stdstring.h>
 
 #include "menu_driver.h"
 #include "menu_display.h"
@@ -32,18 +33,6 @@
  * Its only interaction back to the UI is to arrange for
  * notify_list_loaded on the UI companion.
  */
-
-/* Clicks the back button */
-int menu_entry_go_back(void)
-{
-   size_t new_selection_ptr;
-
-   menu_navigation_ctl(MENU_NAVIGATION_CTL_GET_SELECTION, &new_selection_ptr);
-   menu_entries_pop_stack(&new_selection_ptr, 0, 1);
-   menu_navigation_ctl(MENU_NAVIGATION_CTL_SET_SELECTION, &new_selection_ptr);
-
-   return 0;
-}
 
 enum menu_entry_type menu_entry_get_type(uint32_t i)
 {
@@ -95,6 +84,17 @@ void menu_entry_get_path(uint32_t i, char *s, size_t len)
    menu_entry_get(&entry, 0, i, NULL, true);
 
    strlcpy(s, entry.path, len);
+}
+
+void menu_entry_get_rich_label(uint32_t i, char *s, size_t len)
+{
+   menu_entry_t entry = {{0}};
+   menu_entry_get(&entry, 0, i, NULL, true);
+
+   if (!string_is_empty(entry.rich_label))
+      strlcpy(s, entry.rich_label, len);
+   else
+      strlcpy(s, entry.path, len);
 }
 
 void menu_entry_get_label(uint32_t i, char *s, size_t len)
@@ -214,27 +214,6 @@ void menu_entry_pathdir_get_value(uint32_t i, char *s, size_t len)
    strlcpy(s, entry.value, len);
 }
 
-int menu_entry_pathdir_set_value(uint32_t i, const char *s)
-{
-   const char *menu_path     = NULL;
-   menu_file_list_cbs_t *cbs = menu_entries_get_last_stack_actiondata();
-
-   menu_entries_get_last_stack(&menu_path, NULL, NULL, NULL);
-
-   if (!cbs || !cbs->setting)
-      return -1;
-
-   if (menu_setting_get_type(cbs->setting) != ST_DIR)
-      return -1;
-
-   menu_setting_set_with_string_representation(cbs->setting, menu_path);
-   menu_setting_generic(cbs->setting, false);
-
-   menu_entries_flush_stack(NULL, 49);
-
-   return 0;
-}
-
 void menu_entry_pathdir_extensions(uint32_t i, char *s, size_t len)
 {
    rarch_setting_t *setting = menu_entries_get_setting(i);
@@ -309,16 +288,28 @@ void menu_entry_get(menu_entry_t *entry, size_t stack_idx,
 
    cbs = menu_entries_get_actiondata_at_offset(list, i);
 
-   if (cbs && cbs->action_get_value && use_representation)
+   if (cbs)
    {
-      const char *label         = NULL;
-      menu_entries_get_last_stack(NULL, &label, NULL, NULL);
+      const char *label             = NULL;
+      enum msg_hash_enums enum_idx  = MSG_UNKNOWN;
 
-      cbs->action_get_value(list,
-            &entry->spacing, entry->type, i, label,
-            entry->value,  sizeof(entry->value), 
-            entry_label, path,
-            entry->path, sizeof(entry->path));
+      entry->enum_idx    = cbs->enum_idx;
+
+      menu_entries_get_last_stack(NULL, &label, NULL, &enum_idx, NULL);
+
+      if (cbs->action_get_value && use_representation)
+         cbs->action_get_value(list,
+               &entry->spacing, entry->type, i, label,
+               entry->value,  sizeof(entry->value), 
+               entry_label, path,
+               entry->path, sizeof(entry->path));
+
+      if (cbs->action_label)
+         cbs->action_label(list,
+               entry->type, i,
+               label, path, 
+               entry->rich_label,
+               sizeof(entry->rich_label));
    }
 
    entry->idx         = i;

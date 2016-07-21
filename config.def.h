@@ -29,6 +29,7 @@ enum
 {
    VIDEO_GL = 0,
    VIDEO_VULKAN,
+   VIDEO_DRM,
    VIDEO_XVIDEO,
    VIDEO_SDL,
    VIDEO_SDL2,
@@ -361,7 +362,7 @@ static const bool def_history_list_enable = true;
 
 static const unsigned int def_user_language = 0;
 
-#if (defined(__APPLE__) && defined(__MACH__) && defined(OSX)) || (defined(_WIN32) && !defined(_XBOX))
+#if (defined(_WIN32) && !defined(_XBOX))
 static const bool def_mouse_enable = true;
 #else
 static const bool def_mouse_enable = false;
@@ -410,6 +411,8 @@ static const bool disable_composition = false;
 
 /* Video VSYNC (recommended) */
 static const bool vsync = true;
+
+static const unsigned max_swapchain_images = 3;
 
 /* Attempts to hard-synchronize CPU and GPU.
  * Can reduce latency at cost of performance. */
@@ -509,11 +512,15 @@ static const bool default_overlay_enable = false;
 static const bool overlay_hide_in_menu = true;
 
 #ifdef HAVE_MENU
+#include "menu/menu_display.h"
+
 static bool default_block_config_read = true;
 
 static unsigned xmb_scale_factor = 100;
 static unsigned xmb_alpha_factor = 75;
-static unsigned xmb_theme        = 0;
+
+static unsigned xmb_icon_theme   = XMB_ICON_THEME_MONOCHROME;
+static unsigned xmb_theme        = XMB_THEME_ELECTRIC_BLUE;
 
 #ifdef HAVE_LAKKA
 static bool xmb_shadows_enable   = false;
@@ -521,12 +528,20 @@ static bool xmb_shadows_enable   = false;
 static bool xmb_shadows_enable   = true;
 #endif
 
+static float menu_wallpaper_opacity = 0.300;
+
+static float menu_footer_opacity = 1.000;
+
+static float menu_header_opacity = 1.000;
+
 static unsigned menu_background_gradient = 4;
 
+#if defined(HAVE_CG) || defined(HAVE_HLSL) || defined(HAVE_GLSL) || defined(HAVE_VULKAN)
 #if defined(HAVE_OPENGLES2) || defined(OSX_PPC)
 static unsigned menu_shader_pipeline = 1;
 #else
 static unsigned menu_shader_pipeline = 2;
+#endif
 #endif
 
 static bool show_advanced_settings    = true;
@@ -781,6 +796,8 @@ static const bool input_descriptor_hide_unbound = false;
 static const unsigned input_max_users = 5;
 
 static const unsigned input_poll_type_behavior = 2;
+
+static const unsigned input_bind_timeout = 5;
 
 static const unsigned menu_thumbnails_default = 3;
 

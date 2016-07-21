@@ -50,9 +50,6 @@ RETRO_BEGIN_DECLS
 #define MENU_SETTINGS_PLAYLIST_ASSOCIATION_START 0x20000
 #define MENU_SETTINGS_CHEEVOS_START              0x40000
 
-
-#define MENU_KEYBOARD_BIND_TIMEOUT_SECONDS 5
-
 enum menu_image_type
 {
    MENU_IMAGE_NONE = 0,
@@ -102,9 +99,6 @@ enum rarch_menu_ctl_state
    RARCH_MENU_CTL_NAVIGATION_SET_LAST,
    RARCH_MENU_CTL_NAVIGATION_ASCEND_ALPHABET,
    RARCH_MENU_CTL_NAVIGATION_DESCEND_ALPHABET,
-   RARCH_MENU_CTL_IS_PENDING_ACTION,
-   RARCH_MENU_CTL_SET_PENDING_ACTION,
-   RARCH_MENU_CTL_UNSET_PENDING_ACTION,
    RARCH_MENU_CTL_IS_PENDING_QUICK_MENU,
    RARCH_MENU_CTL_SET_PENDING_QUICK_MENU,
    RARCH_MENU_CTL_UNSET_PENDING_QUICK_MENU,
@@ -171,46 +165,9 @@ enum rarch_menu_ctl_state
    RARCH_MENU_CTL_UPDATE_THUMBNAIL_IMAGE
 };
 
-enum menu_file_type
+enum menu_settings_type
 {
-   MENU_FILE_NONE = 0,
-   MENU_FILE_PLAIN,
-   MENU_FILE_DIRECTORY,
-   MENU_FILE_PARENT_DIRECTORY,
-   MENU_FILE_PATH,
-   MENU_FILE_DEVICE,
-   MENU_FILE_CORE,
-   MENU_FILE_PLAYLIST_ENTRY,
-   MENU_FILE_CONTENTLIST_ENTRY,
-   MENU_FILE_SHADER_PRESET,
-   MENU_FILE_SHADER,
-   MENU_FILE_VIDEOFILTER,
-   MENU_FILE_AUDIOFILTER,
-   MENU_FILE_CHEAT,
-   MENU_FILE_OVERLAY,
-   MENU_FILE_FONT,
-   MENU_FILE_CONFIG,
-   MENU_FILE_USE_DIRECTORY,
-   MENU_FILE_SCAN_DIRECTORY,
-   MENU_FILE_CARCHIVE,
-   MENU_FILE_IN_CARCHIVE,
-   MENU_FILE_IMAGE,
-   MENU_FILE_IMAGEVIEWER,
-   MENU_FILE_REMAP,
-   MENU_FILE_DOWNLOAD_CORE,
-   MENU_FILE_DOWNLOAD_CORE_CONTENT,
-   MENU_FILE_DOWNLOAD_CORE_INFO,
-   MENU_FILE_DOWNLOAD_THUMBNAIL_CONTENT,
-   MENU_FILE_DOWNLOAD_LAKKA,
-   MENU_FILE_RDB,
-   MENU_FILE_RDB_ENTRY,
-   MENU_FILE_RPL_ENTRY,
-   MENU_FILE_CURSOR,
-   MENU_FILE_RECORD_CONFIG,
-   MENU_FILE_PLAYLIST_COLLECTION,
-   MENU_FILE_PLAYLIST_ASSOCIATION,
-   MENU_FILE_MOVIE,
-   MENU_FILE_MUSIC,
+   MENU_SETTINGS_NONE       = FILE_TYPE_LAST + 1,
    MENU_SETTINGS,
    MENU_SETTINGS_TAB,
    MENU_HISTORY_TAB,
@@ -236,13 +193,6 @@ enum menu_file_type
    MENU_SETTING_SUBGROUP,
    MENU_SETTING_HORIZONTAL_MENU,
    MENU_INFO_MESSAGE,
-   MENU_FILE_DOWNLOAD_THUMBNAIL,
-   MENU_FILE_TYPE_T_LAST
-};
-
-enum menu_settings_type
-{
-   MENU_SETTINGS_NONE       = MENU_FILE_TYPE_T_LAST + 1,
    MENU_SETTINGS_SHADER_PARAMETER_0,
    MENU_SETTINGS_SHADER_PARAMETER_LAST = MENU_SETTINGS_SHADER_PARAMETER_0 + (GFX_MAX_PARAMETERS - 1),
    MENU_SETTINGS_SHADER_PRESET_PARAMETER_0,
@@ -339,9 +289,7 @@ typedef struct menu_ctx_driver
    void *(*list_get_entry)(void *data, enum menu_list_type type, unsigned i);
    void  (*list_set_selection)(void *data, file_list_t *list);
    int   (*bind_init)(menu_file_list_cbs_t *cbs,
-         const char *path, const char *label, unsigned type, size_t idx,
-         const char *elem0, const char *elem1,
-         uint32_t label_hash, uint32_t menu_label_hash);
+         const char *path, const char *label, unsigned type, size_t idx);
    bool  (*load_image)(void *userdata, void *data, enum menu_image_type type);
    const char *ident;
    int (*environ_cb)(enum menu_environ_cb type, void *data, void *userdata);
@@ -430,10 +378,7 @@ typedef struct menu_ctx_bind
    const char *label;
    unsigned type;
    size_t idx;
-   const char *elem0;
-   const char *elem1;
    uint32_t label_hash;
-   uint32_t menu_label_hash;
    int retcode;
 } menu_ctx_bind_t;
 
@@ -468,6 +413,8 @@ const char* config_get_menu_driver_options(void);
 
 /* HACK */
 extern unsigned int rdb_entry_start_game_selection_ptr;
+
+const char *menu_driver_ident(void);
 
 bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data);
 

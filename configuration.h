@@ -55,6 +55,7 @@ typedef struct settings
       bool vsync;
       bool hard_sync;
       bool black_frame_insertion;
+      unsigned max_swapchain_images;
       unsigned swap_interval;
       unsigned hard_sync_frames;
       unsigned frame_delay;
@@ -122,6 +123,21 @@ typedef struct settings
 
       struct
       {
+         float opacity;
+      } wallpaper;
+
+      struct
+      {
+         float opacity;
+      } footer;
+
+      struct
+      {
+         float opacity;
+      } header;
+
+      struct
+      {
          bool enable;
       } mouse;
 
@@ -157,15 +173,24 @@ typedef struct settings
       unsigned entry_normal_color;
       unsigned entry_hover_color;
       unsigned title_color;
-      unsigned xmb_scale_factor;
-      unsigned xmb_alpha_factor;
-      unsigned xmb_theme;
-      unsigned background_gradient;
-      bool xmb_shadows_enable;
-      unsigned shader_pipeline;
-      char xmb_font[PATH_MAX_LENGTH];
       bool throttle_framerate;
       bool linear_filter;
+
+      struct
+      {
+         unsigned shader_pipeline;
+         char     font[PATH_MAX_LENGTH];
+         unsigned scale_factor;
+         unsigned alpha_factor;
+         unsigned theme;
+         unsigned menu_color_theme;
+         bool     shadows_enable;
+      } xmb;
+
+      struct
+      {
+         unsigned menu_color_theme;
+      } materialui;
    } menu;
 #endif
 
@@ -248,6 +273,7 @@ typedef struct settings
       float overlay_opacity;
       float overlay_scale;
 
+      unsigned bind_timeout;
       bool input_descriptor_label_show;
       bool input_descriptor_hide_unbound;
 

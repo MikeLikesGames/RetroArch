@@ -43,6 +43,9 @@ static frontend_ctx_driver_t *frontend_ctx_drivers[] = {
 #if defined(__linux__)
    &frontend_ctx_linux,
 #endif
+#if defined(BSD) && !defined(__MACH__)
+   &frontend_ctx_bsd,
+#endif
 #if defined(PSP) || defined(VITA)
    &frontend_ctx_psp,
 #endif
@@ -309,11 +312,51 @@ enum frontend_architecture frontend_driver_get_cpu_architecture(void)
    return frontend->get_architecture();
 }
 
-uint32_t frontend_driver_get_total_memory(void)
+uint64_t frontend_driver_get_total_memory(void)
 {
    frontend_ctx_driver_t *frontend = frontend_get_ptr();
    if (!frontend || !frontend->get_total_mem)
       return 0;
    return frontend->get_total_mem();
+}
+
+uint64_t frontend_driver_get_used_memory(void)
+{
+   frontend_ctx_driver_t *frontend = frontend_get_ptr();
+   if (!frontend || !frontend->get_used_mem)
+      return 0;
+   return frontend->get_used_mem();
+}
+
+void frontend_driver_install_signal_handler(void)
+{
+   frontend_ctx_driver_t *frontend = frontend_get_ptr();
+   if (!frontend || !frontend->install_signal_handler)
+      return;
+   frontend->install_signal_handler();
+}
+
+int frontend_driver_get_signal_handler_state(void)
+{
+   frontend_ctx_driver_t *frontend = frontend_get_ptr();
+   if (!frontend || !frontend->get_signal_handler_state)
+      return -1;
+   return frontend->get_signal_handler_state();
+}
+
+void frontend_driver_set_signal_handler_state(int value)
+{
+   frontend_ctx_driver_t *frontend = frontend_get_ptr();
+   if (!frontend || !frontend->set_signal_handler_state)
+      return;
+   frontend->set_signal_handler_state(value);
+}
+
+void frontend_driver_destroy_signal_handler_state(void)
+{
+   frontend_ctx_driver_t *frontend = frontend_get_ptr();
+   if (!frontend || !frontend->destroy_signal_handler_state)
+      return;
+   frontend->destroy_signal_handler_state();
 }
 #endif

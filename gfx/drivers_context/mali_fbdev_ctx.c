@@ -23,6 +23,7 @@
 
 #include <streams/file_stream.h>
 
+#include "../../frontend/frontend_driver.h"
 #include "../../driver.h"
 #include "../../general.h"
 #include "../../runloop.h"
@@ -106,12 +107,9 @@ static void *gfx_ctx_mali_fbdev_init(void *video_driver)
        return NULL;
 
 #ifdef HAVE_EGL
-   egl_install_sighandlers();
+   frontend_driver_install_signal_handler();
 #endif
 
-   /* Disable cursor blinking so it's not visible in RetroArch. */
-   system("setterm -cursor off");
-   
 #ifdef HAVE_EGL
    if (!egl_init_context(&mali->egl, EGL_DEFAULT_DISPLAY,
             &major, &minor, &n, attribs))
@@ -145,7 +143,7 @@ static void gfx_ctx_mali_fbdev_check_window(void *data, bool *quit,
       *resize = true;
    }
 
-   *quit = g_egl_quit;
+   *quit   = (bool)frontend_driver_get_signal_handler_state();
 }
 
 static bool gfx_ctx_mali_fbdev_set_resize(void *data,
@@ -207,7 +205,9 @@ static bool gfx_ctx_mali_fbdev_set_video_mode(void *data,
       egl_report_error();
       goto error;
    }
+#endif
 
+#ifdef HAVE_EGL
    if (!egl_create_surface(&mali->egl, &mali->native_window))
       goto error;
 #endif

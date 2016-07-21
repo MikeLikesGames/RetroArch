@@ -31,9 +31,9 @@
 
 #include "input_remote.h"
 
-#include "msg_hash.h"
-#include "runloop.h"
-#include "verbosity.h"
+#include "../msg_hash.h"
+#include "../runloop.h"
+#include "../verbosity.h"
 
 #define DEFAULT_NETWORK_GAMEPAD_PORT 55400
 #define UDP_FRAME_PACKETS 16
@@ -216,7 +216,6 @@ void input_remote_poll(input_remote_t *handle)
          char buf[8];
          ssize_t ret;
          fd_set fds;
-         struct timeval tmp_tv = {0};
 
          if (handle->net_fd[user] < 0)
             return;

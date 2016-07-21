@@ -22,7 +22,6 @@
 #include "menu_content.h"
 #include "menu_driver.h"
 #include "menu_display.h"
-#include "menu_hash.h"
 #include "menu_shader.h"
 
 #include "../core_info.h"
@@ -36,8 +35,6 @@
 #include "../runloop.h"
 #include "../verbosity.h"
 
-#include "../tasks/tasks_internal.h"
-
 /**
  * menu_content_load_from_playlist:
  * @playlist             : Playlist handle.
@@ -45,25 +42,21 @@
  *
  * Initializes core and loads content based on playlist entry.
  **/
-static bool menu_content_load_from_playlist(menu_content_ctx_playlist_info_t *info)
+bool menu_content_playlist_load(menu_content_ctx_playlist_info_t *info)
 {
-   unsigned idx;
    playlist_t *playlist            = NULL;
-   const char *core_path           = NULL;
    const char *path                = NULL;
-   content_ctx_info_t content_info = {0};
    
    if (!info)
       return false;
 
    playlist = (playlist_t*)info->data;
-   idx      = info->idx;
 
    if (!playlist)
       return false;
 
    playlist_get_index(playlist,
-         idx, &path, NULL, &core_path, NULL, NULL, NULL);
+         info->idx, &path, NULL, NULL, NULL, NULL, NULL);
 
    if (!string_is_empty(path))
    {
@@ -75,10 +68,10 @@ static bool menu_content_load_from_playlist(menu_content_ctx_playlist_info_t *in
       for (i = 0; i < strlen(path_tolower); ++i)
          path_tolower[i] = tolower(path_tolower[i]);
 
-      if (strstr(path_tolower, ".zip"))
-         strstr(path_tolower, ".zip")[4] = '\0';
-      else if (strstr(path_tolower, ".7z"))
-         strstr(path_tolower, ".7z")[3] = '\0';
+      if (strstr(path_tolower, file_path_str(FILE_PATH_ZIP_EXTENSION)))
+         strstr(path_tolower, file_path_str(FILE_PATH_ZIP_EXTENSION))[4] = '\0';
+      else if (strstr(path_tolower, file_path_str(FILE_PATH_7Z_EXTENSION)))
+         strstr(path_tolower, file_path_str(FILE_PATH_7Z_EXTENSION))[3] = '\0';
 
       path_check = (char *)
          calloc(strlen(path_tolower) + 1, sizeof(char));
@@ -94,19 +87,44 @@ static bool menu_content_load_from_playlist(menu_content_ctx_playlist_info_t *in
          goto error;
    }
 
-   if (task_push_content_load_default(
-         core_path,
-         path,
-         &content_info,
-         CORE_TYPE_PLAIN,
-         CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU,
-         NULL,
-         NULL))
-      return true;
+   return true;
 
 error:
-   runloop_msg_queue_push("File could not be loaded.\n", 1, 100, true);
+   runloop_msg_queue_push("File could not be loaded from playlist.\n", 1, 100, true);
    return false;
+}
+
+bool menu_content_playlist_find_associated_core(const char *path, char *s, size_t len)
+{
+   unsigned j;
+   bool                     ret = false;
+   settings_t *settings         = config_get_ptr();
+   struct string_list *existing_core_names = 
+      string_split(settings->playlist_names, ";");
+   struct string_list *existing_core_paths = 
+      string_split(settings->playlist_cores, ";");
+
+   for (j = 0; j < existing_core_names->size; j++)
+   {
+      if (string_is_equal(path, existing_core_names->elems[j].data))
+      {
+         if (existing_core_paths)
+         {
+            const char *existing_core = existing_core_paths->elems[j].data;
+
+            if (existing_core)
+            {
+               strlcpy(s, existing_core, len);
+               ret = true;
+            }
+         }
+         break;
+      }
+   }
+
+   string_list_free(existing_core_names);
+   string_list_free(existing_core_paths);
+   return ret;
 }
 
 /**
@@ -125,18 +143,17 @@ error:
  * selection needs to be made from a list, otherwise
  * returns true and fills in @s with path to core.
  **/
-static bool menu_content_find_first_core(menu_content_ctx_defer_info_t *def_info)
+bool menu_content_find_first_core(menu_content_ctx_defer_info_t *def_info,
+      bool load_content_with_current_core,
+      char *new_core_path, size_t len)
 {
-   char new_core_path[PATH_MAX_LENGTH]     = {0};
    const core_info_t *info                 = NULL;
    core_info_list_t *core_info             = NULL;
    const char *default_info_dir            = NULL;
    size_t supported                        = 0;
-   uint32_t menu_label_hash                = 0;
 
    if (def_info)
    {
-      menu_label_hash   = menu_hash_calculate(def_info->menu_label);
       core_info         = (core_info_list_t*)def_info->data;
       default_info_dir  = def_info->dir;
    }
@@ -170,7 +187,7 @@ static bool menu_content_find_first_core(menu_content_ctx_defer_info_t *def_info
 
    /* We started the menu with 'Load Content', we are 
     * going to use the current core to load this. */
-   if (menu_label_hash == MENU_LABEL_LOAD_CONTENT)
+   if (load_content_with_current_core)
    {
       core_info_get_current_core((core_info_t**)&info);
       if (info)
@@ -187,28 +204,7 @@ static bool menu_content_find_first_core(menu_content_ctx_defer_info_t *def_info
       return false;
 
     if (info)
-      strlcpy(new_core_path, info->path, sizeof(new_core_path));
-
-   runloop_ctl(RUNLOOP_CTL_SET_CONTENT_PATH, def_info->s);
-
-   if (path_file_exists(new_core_path))
-      runloop_ctl(RUNLOOP_CTL_SET_LIBRETRO_PATH, new_core_path);
-
-   return true;
-}
-
-bool menu_content_ctl(enum menu_content_ctl_state state, void *data)
-{
-   switch (state)
-   {
-      case MENU_CONTENT_CTL_FIND_FIRST_CORE:
-         return menu_content_find_first_core((menu_content_ctx_defer_info_t*)data);
-      case MENU_CONTENT_CTL_LOAD_PLAYLIST:
-         return menu_content_load_from_playlist((menu_content_ctx_playlist_info_t*)data);
-      case MENU_CONTENT_CTL_NONE:
-      default:
-         break;
-   }
+      strlcpy(new_core_path, info->path, len);
 
    return true;
 }

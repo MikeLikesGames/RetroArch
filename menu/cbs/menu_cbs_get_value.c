@@ -21,12 +21,13 @@
 #include "../menu_animation.h"
 #include "../menu_cbs.h"
 #include "../menu_shader.h"
-#include "../menu_hash.h"
+#include "../menu_display.h"
 
 #include "../../input/input_autodetect.h"
 #include "../../input/input_config.h"
 
 #include "../../core_info.h"
+#include "../../file_path_special.h"
 #include "../../managers/core_option_manager.h"
 #include "../../managers/cheat_manager.h"
 #include "../../general.h"
@@ -59,6 +60,36 @@ static void menu_action_setting_disp_set_label_cheat_num_passes(
    *w = 19;
    strlcpy(s2, path, len2);
    snprintf(s, len, "%u", cheat_manager_get_buf_size());
+}
+
+static void menu_action_setting_disp_set_label_cheevos_locked_entry(
+      file_list_t* list,
+      unsigned *w, unsigned type, unsigned i,
+      const char *label,
+      char *s, size_t len,
+      const char *entry_label,
+      const char *path,
+      char *s2, size_t len2)
+{
+   *w = 19;
+   strlcpy(s2, path, len2);
+   strlcpy(s,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CHEEVOS_LOCKED_ENTRY), len);
+}
+
+static void menu_action_setting_disp_set_label_cheevos_unlocked_entry(
+      file_list_t* list,
+      unsigned *w, unsigned type, unsigned i,
+      const char *label,
+      char *s, size_t len,
+      const char *entry_label,
+      const char *path,
+      char *s2, size_t len2)
+{
+   *w = 19;
+   strlcpy(s2, path, len2);
+   strlcpy(s,
+         msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CHEEVOS_UNLOCKED_ENTRY), len);
 }
 
 static void menu_action_setting_disp_set_label_remap_file_load(
@@ -96,7 +127,7 @@ static void menu_action_setting_disp_set_label_configurations(
       fill_pathname_base(s, global->path.config,
             len);
    else
-      strlcpy(s, menu_hash_to_str(MENU_VALUE_DIRECTORY_DEFAULT), len);
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DIRECTORY_DEFAULT), len);
 }
 
 static void menu_action_setting_disp_set_label_shader_filter_pass(
@@ -130,15 +161,15 @@ static void menu_action_setting_disp_set_label_shader_filter_pass(
   switch (shader->pass[pass].filter)
   {
      case 0:
-        strlcpy(s, menu_hash_to_str(MENU_VALUE_DONT_CARE),
+        strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DONT_CARE),
               len);
         break;
      case 1:
-        strlcpy(s, menu_hash_to_str(MENU_VALUE_LINEAR),
+        strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LINEAR),
               len);
         break;
      case 2:
-        strlcpy(s, menu_hash_to_str(MENU_VALUE_NEAREST),
+        strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NEAREST),
               len);
         break;
   }
@@ -159,7 +190,7 @@ static void menu_action_setting_disp_set_label_filter(
    *s = '\0';
    *w = 19;
    strlcpy(s2, path, len2);
-   strlcpy(s, menu_hash_to_str(MENU_VALUE_NOT_AVAILABLE), len);
+   strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
 
    if (settings && *settings->path.softfilter_plugin)
       fill_short_pathname_representation(s,
@@ -180,16 +211,20 @@ static void menu_action_setting_disp_set_label_pipeline(
    *s = '\0';
    *w = 19;
 
-   switch (settings->menu.shader_pipeline)
+   switch (settings->menu.xmb.shader_pipeline)
    {
-      case 0:
-         snprintf(s, len, "%s", "OFF");
+      case XMB_SHADER_PIPELINE_WALLPAPER:
+         strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF), len);
          break;
-      case 1:
-         snprintf(s, len, "%s", "Ribbon (simplified)");
+      case XMB_SHADER_PIPELINE_SIMPLE_RIBBON:
+         strlcpy(s, 
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_SHADER_PIPELINE_RIBBON_SIMPLIFIED), len);
          break;
-      case 2:
-         snprintf(s, len, "%s", "Ribbon");
+      case XMB_SHADER_PIPELINE_RIBBON:
+         strlcpy(s, 
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_SHADER_PIPELINE_RIBBON), len);
          break;
    }
 
@@ -240,7 +275,7 @@ static void menu_action_setting_disp_set_label_shader_pass(
    *s = '\0';
    *w = 19;
    strlcpy(s2, path, len2);
-   strlcpy(s, menu_hash_to_str(MENU_VALUE_NOT_AVAILABLE), len);
+   strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
 
 #if defined(HAVE_CG) || defined(HAVE_GLSL) || defined(HAVE_HLSL)
    menu_driver_ctl(RARCH_MENU_CTL_SHADER_GET,
@@ -248,7 +283,7 @@ static void menu_action_setting_disp_set_label_shader_pass(
    if (!shader)
       return;
 
-   if (*shader->pass[pass].source.path)
+   if (!string_is_empty(shader->pass[pass].source.path))
       fill_pathname_base(s,
             shader->pass[pass].source.path, len);
 #endif
@@ -273,9 +308,9 @@ static void menu_action_setting_disp_set_label_shader_default_filter(
       return;
 
    if (settings->video.smooth)
-      strlcpy(s, menu_hash_to_str(MENU_VALUE_LINEAR), len); 
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_LINEAR), len); 
    else
-      strlcpy(s, menu_hash_to_str(MENU_VALUE_NEAREST), len);
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NEAREST), len);
 }
 
 static void menu_action_setting_disp_set_label_shader_parameter(
@@ -301,7 +336,8 @@ static void menu_action_setting_disp_set_label_shader_parameter(
    if (!shader_info.data)
       return;
 
-   param = &shader_info.data->parameters[type - MENU_SETTINGS_SHADER_PARAMETER_0];
+   param = &shader_info.data->parameters[type - 
+      MENU_SETTINGS_SHADER_PARAMETER_0];
 
    if (!param)
       return;
@@ -377,7 +413,7 @@ static void menu_action_setting_disp_set_label_shader_scale_pass(
    scale_value = shader->pass[pass].fbo.scale_x;
 
    if (!scale_value)
-      strlcpy(s, menu_hash_to_str(MENU_VALUE_DONT_CARE), len);
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_DONT_CARE), len);
    else
       snprintf(s, len, "%ux", scale_value);
 #endif
@@ -440,7 +476,8 @@ static void menu_action_setting_disp_set_label_input_desc(
 
    if (inp_desc_button_index_offset < RARCH_FIRST_CUSTOM_BIND)
    {
-      if(strstr(descriptor,"Auto") && !strstr(descriptor,"(N/A)"))
+      if(strstr(descriptor, "Auto") && !strstr(descriptor,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE)))
          strlcpy(s, 
             descriptor,
             len);
@@ -475,10 +512,10 @@ static void menu_action_setting_disp_set_label_cheat(
       snprintf(s, len, "%s : (%s)",
             (cheat_manager_get_code(cheat_index) != NULL)
             ? cheat_manager_get_code(cheat_index) : 
-            menu_hash_to_str(MENU_VALUE_NOT_AVAILABLE),
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE),
             cheat_manager_get_code_state(cheat_index) ? 
-            menu_hash_to_str(MENU_VALUE_ON) :
-            menu_hash_to_str(MENU_VALUE_OFF)
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_ON) :
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_OFF)
             );
    *w = 19;
    strlcpy(s2, path, len2);
@@ -561,7 +598,7 @@ static void menu_action_setting_disp_set_label_menu_more(
       const char *path,
       char *s2, size_t len2)
 {
-   strlcpy(s, "...", len);
+   strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_MORE), len);
    *w = 19;
    strlcpy(s2, path, len2);
 }
@@ -606,13 +643,19 @@ static void menu_action_setting_disp_set_label_poll_type_behavior(
    switch (settings->input.poll_type_behavior)
    {
       case 0:
-         snprintf(s, len, "%s", "Early");
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_INPUT_POLL_TYPE_BEHAVIOR_EARLY), len);
          break;
       case 1:
-         snprintf(s, len, "%s", "Normal");
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_INPUT_POLL_TYPE_BEHAVIOR_NORMAL), len);
          break;
       case 2:
-         snprintf(s, len, "%s", "Late");
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_INPUT_POLL_TYPE_BEHAVIOR_LATE), len);
          break;
    }
 }
@@ -633,27 +676,32 @@ static void menu_action_setting_disp_set_label_xmb_theme(
 
    strlcpy(s2, path, len2);
    *w = 19;
-   switch (settings->menu.xmb_theme)
+   switch (settings->menu.xmb.theme)
    {
-      case 0:
-         snprintf(s, len, "%s", "Monochrome");
+      case XMB_ICON_THEME_MONOCHROME:
+         strlcpy(s,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_XMB_ICON_THEME_MONOCHROME), len);
          break;
-      case 1:
-         snprintf(s, len, "%s", "FlatUI");
+      case XMB_ICON_THEME_FLATUI:
+         strlcpy(s,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_XMB_ICON_THEME_FLATUI), len);
          break;
-      case 2:
-         snprintf(s, len, "%s", "RetroActive");
+      case XMB_ICON_THEME_RETROACTIVE:
+         strlcpy(s,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_XMB_ICON_THEME_RETROACTIVE), len);
          break;
-      case 3:
-         snprintf(s, len, "%s", "Pixel");
+      case XMB_ICON_THEME_PIXEL:
+         strlcpy(s,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_XMB_ICON_THEME_PIXEL), len);
          break;
-      case 4:
-         snprintf(s, len, "%s", "Custom");
+      case XMB_ICON_THEME_CUSTOM:
+         strlcpy(s,
+               msg_hash_to_str(MENU_ENUM_LABEL_VALUE_XMB_ICON_THEME_CUSTOM), len);
          break;
    }
 }
 
-static void menu_action_setting_disp_set_label_xmb_gradient(
+static void menu_action_setting_disp_set_label_xmb_menu_color_theme(
       file_list_t* list,
       unsigned *w, unsigned type, unsigned i,
       const char *label,
@@ -664,39 +712,132 @@ static void menu_action_setting_disp_set_label_xmb_gradient(
 {
    settings_t *settings        = config_get_ptr();
 
+   strlcpy(s2, path, len2);
+   *w = 19;
+
    if (!settings)
       return;
 
+   switch (settings->menu.xmb.menu_color_theme)
+   {
+      case XMB_THEME_WALLPAPER:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_PLAIN),
+               len);
+         break;
+      case XMB_THEME_LEGACY_RED:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_LEGACY_RED),
+               len);
+         break;
+      case XMB_THEME_DARK_PURPLE:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_DARK_PURPLE),
+               len);
+         break;
+      case XMB_THEME_MIDNIGHT_BLUE:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_MIDNIGHT_BLUE),
+               len);
+         break;
+      case XMB_THEME_GOLDEN:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_GOLDEN),
+               len);
+         break;
+      case XMB_THEME_ELECTRIC_BLUE:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_ELECTRIC_BLUE),
+               len);
+         break;
+      case XMB_THEME_APPLE_GREEN:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_APPLE_GREEN),
+               len);
+         break;
+      case XMB_THEME_UNDERSEA:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_UNDERSEA),
+               len);
+         break;
+      case XMB_THEME_VOLCANIC_RED:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_VOLCANIC_RED),
+               len);
+         break;
+      case XMB_THEME_DARK:
+         strlcpy(s,
+               msg_hash_to_str(
+                 MENU_ENUM_LABEL_VALUE_XMB_MENU_COLOR_THEME_DARK),
+               len);
+         break;
+   }
+}
+
+static void menu_action_setting_disp_set_label_materialui_menu_color_theme(
+      file_list_t* list,
+      unsigned *w, unsigned type, unsigned i,
+      const char *label,
+      char *s, size_t len,
+      const char *entry_label,
+      const char *path,
+      char *s2, size_t len2)
+{
+   settings_t *settings        = config_get_ptr();
+
    strlcpy(s2, path, len2);
    *w = 19;
-   switch (settings->menu.background_gradient)
+
+   if (!settings)
+      return;
+
+   switch (settings->menu.materialui.menu_color_theme)
    {
-      case 0:
-         snprintf(s, len, "%s", "Legacy Red");
+      case MATERIALUI_THEME_BLUE:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_BLUE), len);
          break;
-      case 1:
-         snprintf(s, len, "%s", "Dark Purple");
+      case MATERIALUI_THEME_BLUE_GREY:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_BLUE_GREY), len);
          break;
-      case 2:
-         snprintf(s, len, "%s", "Midnight Blue");
+      case MATERIALUI_THEME_GREEN:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_GREEN), len);
          break;
-      case 3:
-         snprintf(s, len, "%s", "Golden");
+      case MATERIALUI_THEME_RED:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_RED), len);
          break;
-      case 4:
-         snprintf(s, len, "%s", "Electric Blue");
+      case MATERIALUI_THEME_YELLOW:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_YELLOW), len);
          break;
-      case 5:
-         snprintf(s, len, "%s", "Apple Green");
+      case MATERIALUI_THEME_DARK_BLUE:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_DARK_BLUE), len);
          break;
-      case 6:
-         snprintf(s, len, "%s", "Undersea");
+      case MATERIALUI_THEME_NVIDIA_SHIELD:
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_MATERIALUI_MENU_COLOR_THEME_NVIDIA_SHIELD), len);
          break;
-      case 7:
-         snprintf(s, len, "%s", "Volcanic Red");
-         break;
-      case 8:
-         snprintf(s, len, "%s", "Dark");
+      default:
          break;
    }
 }
@@ -717,19 +858,27 @@ static void menu_action_setting_disp_set_label_thumbnails(
 
    strlcpy(s2, path, len2);
    *w = 19;
+
    switch (settings->menu.thumbnails)
    {
       case 0:
-         snprintf(s, len, "%s", "OFF");
+         strlcpy(s, msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_OFF), len);
          break;
       case 1:
-         snprintf(s, len, "%s", "Screenshots");
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_THUMBNAIL_MODE_SCREENSHOTS), len);
          break;
       case 2:
-         snprintf(s, len, "%s", "Title Screens");
+         strlcpy(s, 
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_THUMBNAIL_MODE_TITLE_SCREENS), len);
          break;
       case 3:
-         snprintf(s, len, "%s", "Boxarts");
+         strlcpy(s,
+               msg_hash_to_str(
+                  MENU_ENUM_LABEL_VALUE_THUMBNAIL_MODE_BOXARTS), len);
          break;
    }
 }
@@ -753,13 +902,16 @@ static void menu_action_setting_disp_set_label_menu_toggle_gamepad_combo(
    switch (settings->input.menu_toggle_gamepad_combo)
    {
       case 0:
-         snprintf(s, len, "%s", "None");
+         strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NONE), len);
          break;
       case 1:
-         snprintf(s, len, "%s", "Down + L1 + R1 + Y");
+         strlcpy(s, "Down + L1 + R1 + Y", len);
          break;
       case 2:
-         snprintf(s, len, "%s", "L3 + R3");
+         strlcpy(s, "L3 + R3", len);
+	 break;
+      case 3:
+         strlcpy(s, "Start + Select", len);
          break;
    }
 }
@@ -800,7 +952,7 @@ static void menu_action_setting_disp_set_label_menu_disk_index(
    current = control->get_image_index();
 
    if (current >= images)
-      strlcpy(s, menu_hash_to_str(MENU_VALUE_NO_DISK), len);
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NO_DISK), len);
    else
       snprintf(s, len, "%u", current + 1);
 }
@@ -828,7 +980,7 @@ static void menu_action_setting_disp_set_label_menu_input_keyboard_gamepad_mappi
    switch (settings->input.keyboard_gamepad_mapping_type)
    {
       case 0:
-         strlcpy(s, "None", len);
+         strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NONE), len);
          break;
       case 1:
          strlcpy(s, "iPega PG-9017", len);
@@ -868,7 +1020,7 @@ static void menu_action_setting_disp_set_label_menu_video_resolution(
          snprintf(s, len, "%ux%u", width, height);
    }
    else
-      strlcpy(s, menu_hash_to_str(MENU_VALUE_NOT_AVAILABLE), len);
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
 }
 
 static void menu_action_setting_generic_disp_set_label(
@@ -1198,8 +1350,9 @@ static void menu_action_setting_disp_set_label_playlist_associations(file_list_t
    *s = '\0';
    *w = 19;
 
-   strlcpy(playlist_name_with_ext, path, sizeof(playlist_name_with_ext));
-   strlcat(playlist_name_with_ext, ".lpl", sizeof(playlist_name_with_ext));
+   fill_pathname_noext(playlist_name_with_ext, path,
+         file_path_str(FILE_PATH_LPL_EXTENSION),
+         sizeof(playlist_name_with_ext));
 
    for (i = 0; i < str_list->size; i++)
    {
@@ -1219,8 +1372,8 @@ static void menu_action_setting_disp_set_label_playlist_associations(file_list_t
    string_list_free(str_list);
    string_list_free(str_list2);
 
-   if (string_is_equal(s, "DETECT") || !found_matching_core_association)
-      strlcpy(s, "N/A", len);
+   if (string_is_equal(s, file_path_str(FILE_PATH_DETECT)) || !found_matching_core_association)
+      strlcpy(s, msg_hash_to_str(MENU_ENUM_LABEL_VALUE_NOT_AVAILABLE), len);
    else
    {
       char buf[PATH_MAX_LENGTH];
@@ -1273,7 +1426,7 @@ static void menu_action_setting_disp_set_label_content_history(
       char *s2, size_t len2)
 {
    *s = '\0';
-   *w = strlen(label);
+   *w = 19;
 
    menu_setting_get_label(list, s,
          len, w, type, label, entry_label, i);
@@ -1353,114 +1506,125 @@ static void menu_action_setting_disp_set_label(file_list_t* list,
 }
 
 static int menu_cbs_init_bind_get_string_representation_compare_label(
-      menu_file_list_cbs_t *cbs, uint32_t label_hash)
+      menu_file_list_cbs_t *cbs)
 {
-   switch (label_hash)
+   if (cbs->enum_idx != MSG_UNKNOWN)
    {
-      case MENU_LABEL_STATE_SLOT:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_state);
-         break;
-      case MENU_LABEL_INPUT_POLL_TYPE_BEHAVIOR:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_poll_type_behavior);
-         break;
-      case MENU_LABEL_XMB_THEME:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_xmb_theme);
-         break;
-      case MENU_LABEL_XMB_GRADIENT:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_xmb_gradient);
-         break;
-      case MENU_LABEL_THUMBNAILS:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_thumbnails);
-         break;
-      case MENU_LABEL_INPUT_MENU_TOGGLE_GAMEPAD_COMBO:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_menu_toggle_gamepad_combo);
-         break;
-      case MENU_LABEL_CHEAT_NUM_PASSES:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_cheat_num_passes);
-         break;
-      case MENU_LABEL_REMAP_FILE_LOAD:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_remap_file_load);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_FILTER_PASS:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_shader_filter_pass);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_SCALE_PASS:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_shader_scale_pass);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_NUM_PASSES:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_shader_num_passes);
-         break;
-      case MENU_LABEL_XMB_RIBBON_ENABLE:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_pipeline);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_PASS:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_shader_pass);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_DEFAULT_FILTER:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_shader_default_filter);
-         break;
-      case MENU_LABEL_VIDEO_FILTER:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_filter);
-         break;
-      case MENU_LABEL_CONFIGURATIONS:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_configurations);
-         break;
-      case MENU_LABEL_SCREEN_RESOLUTION:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_menu_video_resolution);
-         break;
-      case MENU_LABEL_INPUT_KEYBOARD_GAMEPAD_MAPPING_TYPE:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_menu_input_keyboard_gamepad_mapping_type);
-         break;
-      case MENU_LABEL_CONTENT_COLLECTION_LIST:
-      case MENU_LABEL_LOAD_CONTENT_HISTORY:
-      case MENU_LABEL_DOWNLOADED_FILE_DETECT_CORE_LIST:
-      case MENU_LABEL_DETECT_CORE_LIST:
-      case MENU_LABEL_LOAD_CONTENT:
-      case MENU_LABEL_CORE_OPTIONS:
-      case MENU_LABEL_CORE_CHEAT_OPTIONS:
-      case MENU_LABEL_SHADER_OPTIONS:
-      case MENU_LABEL_VIDEO_SHADER_PARAMETERS:
-      case MENU_LABEL_VIDEO_SHADER_PRESET_PARAMETERS:
-      case MENU_LABEL_VIDEO_SHADER_PRESET_SAVE_AS:
-      case MENU_LABEL_CHEAT_FILE_SAVE_AS:
-      case MENU_LABEL_FRONTEND_COUNTERS:
-      case MENU_LABEL_CORE_COUNTERS:
-      case MENU_LABEL_DATABASE_MANAGER_LIST:
-      case MENU_LABEL_CURSOR_MANAGER_LIST:
-      case MENU_LABEL_RESTART_CONTENT:
-      case MENU_LABEL_CLOSE_CONTENT:
-      case MENU_LABEL_RESUME_CONTENT:
-      case MENU_LABEL_TAKE_SCREENSHOT:
-      case MENU_LABEL_CORE_INPUT_REMAPPING_OPTIONS:
-      case MENU_LABEL_CORE_INFORMATION:
-      case MENU_LABEL_SYSTEM_INFORMATION:
-      case MENU_LABEL_DEBUG_INFORMATION:
-      case MENU_LABEL_ACHIEVEMENT_LIST:
-      case MENU_LABEL_SAVE_STATE:
-      case MENU_LABEL_LOAD_STATE:
-         BIND_ACTION_GET_VALUE(cbs,
-            menu_action_setting_disp_set_label_menu_more);
-         break;
-      default:
-         return - 1;
+      switch (cbs->enum_idx)
+      {
+         case MENU_ENUM_LABEL_STATE_SLOT:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_state);
+            break;
+         case MENU_ENUM_LABEL_INPUT_POLL_TYPE_BEHAVIOR:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_poll_type_behavior);
+            break;
+         case MENU_ENUM_LABEL_XMB_THEME:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_xmb_theme);
+            break;
+         case MENU_ENUM_LABEL_XMB_MENU_COLOR_THEME:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_xmb_menu_color_theme);
+            break;
+         case MENU_ENUM_LABEL_MATERIALUI_MENU_COLOR_THEME:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_materialui_menu_color_theme);
+            break;
+         case MENU_ENUM_LABEL_THUMBNAILS:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_thumbnails);
+            break;
+         case MENU_ENUM_LABEL_INPUT_MENU_ENUM_TOGGLE_GAMEPAD_COMBO:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_menu_toggle_gamepad_combo);
+            break;
+         case MENU_ENUM_LABEL_CHEAT_NUM_PASSES:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_cheat_num_passes);
+            break;
+         case MENU_ENUM_LABEL_REMAP_FILE_LOAD:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_remap_file_load);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_FILTER_PASS:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_shader_filter_pass);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_SCALE_PASS:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_shader_scale_pass);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_NUM_PASSES:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_shader_num_passes);
+            break;
+         case MENU_ENUM_LABEL_XMB_RIBBON_ENABLE:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_pipeline);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PASS:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_shader_pass);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_DEFAULT_FILTER:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_shader_default_filter);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_FILTER:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_filter);
+            break;
+         case MENU_ENUM_LABEL_CONFIGURATIONS:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_configurations);
+            break;
+         case MENU_ENUM_LABEL_SCREEN_RESOLUTION:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_menu_video_resolution);
+            break;
+         case MENU_ENUM_LABEL_INPUT_KEYBOARD_GAMEPAD_MAPPING_TYPE:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_menu_input_keyboard_gamepad_mapping_type);
+            break;
+         case MENU_ENUM_LABEL_CONTENT_COLLECTION_LIST:
+         case MENU_ENUM_LABEL_LOAD_CONTENT_HISTORY:
+         case MENU_ENUM_LABEL_DOWNLOADED_FILE_DETECT_CORE_LIST:
+         case MENU_ENUM_LABEL_DETECT_CORE_LIST:
+         case MENU_ENUM_LABEL_LOAD_CONTENT:
+         case MENU_ENUM_LABEL_CORE_OPTIONS:
+         case MENU_ENUM_LABEL_CORE_CHEAT_OPTIONS:
+         case MENU_ENUM_LABEL_SHADER_OPTIONS:
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PARAMETERS:
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_PARAMETERS:
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PRESET_SAVE_AS:
+         case MENU_ENUM_LABEL_CHEAT_FILE_SAVE_AS:
+         case MENU_ENUM_LABEL_FRONTEND_COUNTERS:
+         case MENU_ENUM_LABEL_CORE_COUNTERS:
+         case MENU_ENUM_LABEL_DATABASE_MANAGER_LIST:
+         case MENU_ENUM_LABEL_CURSOR_MANAGER_LIST:
+         case MENU_ENUM_LABEL_RESTART_CONTENT:
+         case MENU_ENUM_LABEL_CLOSE_CONTENT:
+         case MENU_ENUM_LABEL_RESUME_CONTENT:
+         case MENU_ENUM_LABEL_TAKE_SCREENSHOT:
+         case MENU_ENUM_LABEL_CORE_INPUT_REMAPPING_OPTIONS:
+         case MENU_ENUM_LABEL_CORE_INFORMATION:
+         case MENU_ENUM_LABEL_SYSTEM_INFORMATION:
+         case MENU_ENUM_LABEL_DEBUG_INFORMATION:
+         case MENU_ENUM_LABEL_ACHIEVEMENT_LIST:
+         case MENU_ENUM_LABEL_SAVE_STATE:
+         case MENU_ENUM_LABEL_LOAD_STATE:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_menu_more);
+            break;
+         default:
+            return - 1;
+      }
+   }
+   else
+   {
+      return -1;
    }
 
    return 0;
@@ -1501,88 +1665,88 @@ static int menu_cbs_init_bind_get_string_representation_compare_type(
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_core_option_create);
             break;
-         case MENU_FILE_CORE:
+         case FILE_TYPE_CORE:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_core);
             break;
-         case MENU_FILE_PLAIN:
+         case FILE_TYPE_PLAIN:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_plain);
             break;
-         case MENU_FILE_MOVIE:
+         case FILE_TYPE_MOVIE:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_movie);
             break;
-         case MENU_FILE_MUSIC:
+         case FILE_TYPE_MUSIC:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_music);
             break;
-         case MENU_FILE_IMAGE:
+         case FILE_TYPE_IMAGE:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_image);
             break;
-         case MENU_FILE_IMAGEVIEWER:
+         case FILE_TYPE_IMAGEVIEWER:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_imageviewer);
             break;
-         case MENU_FILE_USE_DIRECTORY:
+         case FILE_TYPE_USE_DIRECTORY:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_use_directory);
             break;
-         case MENU_FILE_DIRECTORY:
+         case FILE_TYPE_DIRECTORY:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_directory);
             break;
-         case MENU_FILE_PARENT_DIRECTORY:
+         case FILE_TYPE_PARENT_DIRECTORY:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_parent_directory);
             break;
-         case MENU_FILE_CARCHIVE:
+         case FILE_TYPE_CARCHIVE:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_carchive);
             break;
-         case MENU_FILE_OVERLAY:
+         case FILE_TYPE_OVERLAY:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_overlay);
             break;
-         case MENU_FILE_FONT:
+         case FILE_TYPE_FONT:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_font);
             break;
-         case MENU_FILE_SHADER:
+         case FILE_TYPE_SHADER:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_shader);
             break;
-         case MENU_FILE_SHADER_PRESET:
+         case FILE_TYPE_SHADER_PRESET:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_shader_preset);
             break;
-         case MENU_FILE_CONFIG:
+         case FILE_TYPE_CONFIG:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_config);
             break;
-         case MENU_FILE_IN_CARCHIVE:
+         case FILE_TYPE_IN_CARCHIVE:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_in_carchive);
             break;
-         case MENU_FILE_VIDEOFILTER:
-         case MENU_FILE_AUDIOFILTER:
+         case FILE_TYPE_VIDEOFILTER:
+         case FILE_TYPE_AUDIOFILTER:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_filter);
             break;
-         case MENU_FILE_DOWNLOAD_CORE:
+         case FILE_TYPE_DOWNLOAD_CORE:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_url_core);
             break;
-         case MENU_FILE_RDB:
+         case FILE_TYPE_RDB:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_rdb);
             break;
-         case MENU_FILE_CURSOR:
+         case FILE_TYPE_CURSOR:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_cursor);
             break;
-         case MENU_FILE_CHEAT:
+         case FILE_TYPE_CHEAT:
             BIND_ACTION_GET_VALUE(cbs,
                menu_action_setting_disp_set_label_menu_file_cheat);
             break;
@@ -1606,33 +1770,42 @@ static int menu_cbs_init_bind_get_string_representation_compare_type(
 }
 
 int menu_cbs_init_bind_get_string_representation(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash)
+      const char *path, const char *label, unsigned type, size_t idx)
 {
    if (!cbs)
       return -1;
 
-   switch (menu_label_hash)
+   if (cbs->enum_idx != MSG_UNKNOWN)
    {
-      case MENU_LABEL_LOAD_CONTENT_HISTORY:
-         BIND_ACTION_GET_VALUE(cbs,
-               menu_action_setting_disp_set_label_content_history);
-         return 0;
-      case MENU_LABEL_SYSTEM_INFORMATION:
-         BIND_ACTION_GET_VALUE(cbs,
-               menu_action_setting_disp_set_label_system_information);
-         return 0;
-      case MENU_LABEL_DEBUG_INFORMATION:
-         BIND_ACTION_GET_VALUE(cbs,
-               menu_action_setting_disp_set_label_debug_information);
-         return 0;
-      case MENU_LABEL_ACHIEVEMENT_LIST:
-         BIND_ACTION_GET_VALUE(cbs,
-               menu_action_setting_disp_set_label_achievement_information);
-         return 0;
-      default:
-         break;
+      switch (cbs->enum_idx)
+      {
+         case MENU_ENUM_LABEL_CHEEVOS_UNLOCKED_ENTRY:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_cheevos_unlocked_entry);
+            return 0;
+         case MENU_ENUM_LABEL_CHEEVOS_LOCKED_ENTRY:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_cheevos_locked_entry);
+            return 0;
+         case MENU_ENUM_LABEL_LOAD_CONTENT_HISTORY:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_content_history);
+            return 0;
+         case MENU_ENUM_LABEL_SYSTEM_INFORMATION:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_system_information);
+            return 0;
+         case MENU_ENUM_LABEL_DEBUG_INFORMATION:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_debug_information);
+            return 0;
+         case MENU_ENUM_LABEL_ACHIEVEMENT_LIST:
+            BIND_ACTION_GET_VALUE(cbs,
+                  menu_action_setting_disp_set_label_achievement_information);
+            return 0;
+         default:
+            break;
+      }
    }
 
    if (type >= MENU_SETTINGS_PLAYLIST_ASSOCIATION_START)
@@ -1663,7 +1836,7 @@ int menu_cbs_init_bind_get_string_representation(menu_file_list_cbs_t *cbs,
       return 0;
    }
 
-   if (menu_cbs_init_bind_get_string_representation_compare_label(cbs, label_hash) == 0)
+   if (menu_cbs_init_bind_get_string_representation_compare_label(cbs) == 0)
       return 0;
 
    if (menu_cbs_init_bind_get_string_representation_compare_type(cbs, type) == 0)

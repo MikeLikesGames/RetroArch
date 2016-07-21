@@ -35,10 +35,19 @@
 #include "../deps/glslang/glslang/SPIRV/doc.cpp"
 #include "../deps/glslang/glslang/SPIRV/GlslangToSpv.cpp"
 #include "../deps/glslang/glslang/SPIRV/disassemble.cpp"
+#include "../deps/glslang/glslang/SPIRV/logger.cpp"
 #include "../deps/glslang/glslang/glslang/GenericCodeGen/Link.cpp"
+#include "../deps/glslang/glslang/glslang/GenericCodeGen/CodeGen.cpp"
+#include "../deps/glslang/glslang/hlsl/hlslGrammar.cpp"
+#include "../deps/glslang/glslang/hlsl/hlslOpMap.cpp"
+#include "../deps/glslang/glslang/hlsl/hlslTokenStream.cpp"
+#include "../deps/glslang/glslang/hlsl/hlslScanContext.cpp"
+#include "../deps/glslang/glslang/hlsl/hlslParseHelper.cpp"
+#include "../deps/glslang/glslang/hlsl/hlslParseables.cpp"
 #include "../deps/glslang/glslang/glslang/GenericCodeGen/CodeGen.cpp"
 #include "../deps/glslang/glslang/OGLCompilersDLL/InitializeDll.cpp"
 #include "../deps/glslang/glslang/glslang/MachineIndependent/Intermediate.cpp"
+#include "../deps/glslang/glslang/glslang/MachineIndependent/propagateNoContraction.cpp"
 #include "../deps/glslang/glslang/glslang/MachineIndependent/Versions.cpp"
 #include "../deps/glslang/glslang/glslang/MachineIndependent/RemoveTree.cpp"
 #include "../deps/glslang/glslang/glslang/MachineIndependent/limits.cpp"
@@ -96,6 +105,12 @@ UI COMMON CONTEXT
 
 #if defined(HAVE_OPENGL) || defined(HAVE_VULKAN)
 #include "../gfx/drivers_context/wgl_ctx.cpp"
+#endif
+
+#if defined(HAVE_FFMPEG)
+#if defined(HAVE_OPENGL) || defined(HAVE_OPENGLES3)
+#include "../cores/libretro-ffmpeg/fft/fft.cpp"
+#endif
 #endif
 
 #endif

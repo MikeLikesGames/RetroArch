@@ -30,7 +30,7 @@
 #endif
 
 #ifndef PACKAGE_VERSION
-#define PACKAGE_VERSION "1.3.4"
+#define PACKAGE_VERSION "1.3.6"
 #endif
 
 #endif

@@ -236,7 +236,7 @@ static bool netplay_get_cmd(netplay_t *netplay)
       case NETPLAY_CMD_FLIP_PLAYERS:
          if (cmd_size != sizeof(uint32_t))
          {
-            RARCH_ERR("CMD_FLIP_PLAYERS recieved an unexpected command size.\n");
+            RARCH_ERR("CMD_FLIP_PLAYERS received an unexpected command size.\n");
             return netplay_cmd_nak(netplay);
          }
 
@@ -953,7 +953,7 @@ static void netplay_flip_users(netplay_t *netplay)
       netplay, NETPLAY_CMD_FLIP_PLAYERS,
       &flip_frame_net, sizeof flip_frame_net,
       CMD_OPT_HOST_ONLY | CMD_OPT_REQUIRE_SYNC,
-      "flip users", "Succesfully flipped users.\n");
+      "flip users", "Successfully flipped users.\n");
    
    if(command)
    {

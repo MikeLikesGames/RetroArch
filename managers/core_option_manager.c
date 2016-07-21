@@ -46,7 +46,8 @@ struct core_option_manager
    bool updated;
 };
 
-static bool core_option_manager_parse_variable(core_option_manager_t *opt, size_t idx,
+static bool core_option_manager_parse_variable(
+      core_option_manager_t *opt, size_t idx,
       const struct retro_variable *var)
 {
    const char *val_start      = NULL;
@@ -263,7 +264,8 @@ bool core_option_manager_flush(core_option_manager_t *opt)
  * Returns: true (1) if core option values could be
  * successfully saved to disk, otherwise false (0).
  **/
-bool core_option_manager_flush_game_specific(core_option_manager_t *opt, char* path)
+bool core_option_manager_flush_game_specific(
+      core_option_manager_t *opt, char* path)
 {
    size_t i;
    for (i = 0; i < opt->size; i++)

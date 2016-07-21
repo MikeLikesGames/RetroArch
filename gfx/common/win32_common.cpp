@@ -50,6 +50,7 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam);
 
 extern "C" bool dinput_handle_message(void *dinput, UINT message, WPARAM wParam, LPARAM lParam);
 
+bool doubleclick_on_titlebar = false;
 unsigned g_resize_width;
 unsigned g_resize_height;
 bool g_restore_desktop;
@@ -75,6 +76,19 @@ typedef REASON_CONTEXT POWER_REQUEST_CONTEXT, *PPOWER_REQUEST_CONTEXT, *LPPOWER_
 static HMONITOR win32_monitor_last;
 static unsigned win32_monitor_count;
 static HMONITOR win32_monitor_all[MAX_MONITORS];
+
+extern "C"
+{
+	bool doubleclick_on_titlebar_pressed(void)
+	{
+		return doubleclick_on_titlebar;
+	}
+
+        void unset_doubleclick_on_titlebar(void)
+        {
+           doubleclick_on_titlebar = false;
+        }
+};
 
 INT_PTR CALLBACK PickCoreProc(HWND hDlg, UINT message, 
         WPARAM wParam, LPARAM lParam)
@@ -224,9 +238,16 @@ static int win32_drag_query_file(HWND hwnd, WPARAM wparam)
       const core_info_t *core_info     = NULL;
       settings_t *settings             = config_get_ptr();
 
+	  if (!settings)
+		  return 0;
+
       DragQueryFile((HDROP)wparam, 0, szFilename, 1024);
 
       core_info_get_list(&core_info_list);
+
+	  if (!core_info_list)
+		  return 0;
+
       core_info_list_get_supported_cores(core_info_list,
             (const char*)szFilename, &core_info, &list_size);
 
@@ -243,10 +264,10 @@ static int win32_drag_query_file(HWND hwnd, WPARAM wparam)
          {
             const core_info_t *info = (const core_info_t*)&core_info[i];
 
-            if(strcmp(info->systemname, current_core->systemname))
+            if(!string_is_equal(info->systemname, current_core->systemname))
                break;
 
-            if(!strcmp(settings->path.libretro,info->path))
+            if(string_is_equal(settings->path.libretro, info->path))
             {
                /* Our previous core supports the current rom */
                content_ctx_info_t content_info = {0};
@@ -256,7 +277,6 @@ static int win32_drag_query_file(HWND hwnd, WPARAM wparam)
                      CORE_TYPE_PLAIN,
                      CONTENT_MODE_LOAD_CONTENT_WITH_CURRENT_CORE_FROM_COMPANION_UI,
                      NULL, NULL);
-               DragFinish((HDROP)wparam);
                return 0;
             }
          }
@@ -267,12 +287,14 @@ static int win32_drag_query_file(HWND hwnd, WPARAM wparam)
       {
          /*pick core that only exists and is bound to work. Ish. */
          const core_info_t *info = (const core_info_t*)&core_info[0];
-         task_push_content_load_default(
-               info->path, NULL,
-               &content_info,
-               CORE_TYPE_PLAIN,
-               CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI,
-               NULL, NULL);
+
+         if (info)
+            task_push_content_load_default(
+                  info->path, NULL,
+                  &content_info,
+                  CORE_TYPE_PLAIN,
+                  CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI,
+                  NULL, NULL);
       }
       else
       {
@@ -288,7 +310,6 @@ static int win32_drag_query_file(HWND hwnd, WPARAM wparam)
                   NULL, NULL);
          }
       }
-      DragFinish((HDROP)wparam);
    }
 
    return 0;
@@ -298,6 +319,9 @@ static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
       WPARAM wparam, LPARAM lparam)
 {
    settings_t *settings     = config_get_ptr();
+
+   if (message == WM_NCLBUTTONDBLCLK)
+      doubleclick_on_titlebar = true;
 
    switch (message)
    {
@@ -312,7 +336,13 @@ static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
          }
          break;
       case WM_DROPFILES:
-         return win32_drag_query_file(hwnd, wparam);
+         {
+            int ret = win32_drag_query_file(hwnd, wparam);
+            DragFinish((HDROP)wparam);
+            if (ret != 0)
+               return 0;
+         }
+         break;
       case WM_CHAR:
       case WM_KEYDOWN:
       case WM_KEYUP:
@@ -351,11 +381,16 @@ static LRESULT CALLBACK WndProcCommon(bool *quit, HWND hwnd, UINT message,
    return 0;
 }
 
+extern void ui_window_win32_set_droppable(void *data, bool droppable);
+
 LRESULT CALLBACK WndProcD3D(HWND hwnd, UINT message,
       WPARAM wparam, LPARAM lparam)
 {
    LRESULT ret;
    bool quit = false;
+
+   if (message == WM_NCLBUTTONDBLCLK)
+      doubleclick_on_titlebar = true;
 
    switch (message)
    {
@@ -377,15 +412,13 @@ LRESULT CALLBACK WndProcD3D(HWND hwnd, UINT message,
       case WM_CREATE:
          {
             ui_window_win32_t win32_window;
-            const ui_window_t *window = ui_companion_driver_get_window_ptr();
             LPCREATESTRUCT p_cs   = (LPCREATESTRUCT)lparam;
             curD3D                = p_cs->lpCreateParams;
             g_inited              = true;
             
             win32_window.hwnd     = hwnd;
 
-            if (window)
-               window->set_droppable(&win32_window, true);
+            ui_window_win32_set_droppable(&win32_window, true);
          }
          return 0;
    }
@@ -401,6 +434,9 @@ LRESULT CALLBACK WndProcGL(HWND hwnd, UINT message,
    LRESULT ret;
    bool quit = false;
    settings_t *settings     = config_get_ptr();
+
+   if (message == WM_NCLBUTTONDBLCLK)
+      doubleclick_on_titlebar = true;
 
    switch (message)
    {
@@ -423,13 +459,11 @@ LRESULT CALLBACK WndProcGL(HWND hwnd, UINT message,
       case WM_CREATE:
          {
             ui_window_win32_t win32_window;
-            const ui_window_t *window = ui_companion_driver_get_window_ptr();
             win32_window.hwnd           = hwnd;
 
             create_graphics_context(hwnd, &g_quit);
 
-            if (window)
-               window->set_droppable(&win32_window, true);
+            ui_window_win32_set_droppable(&win32_window, true);
          }
          return 0;
    }
@@ -569,7 +603,7 @@ bool win32_suppress_screensaver(void *data, bool enable)
 
       frontend->get_os(tmp, sizeof(tmp), &major, &minor);
 
-      if (major >= 6 && minor >= 1)
+      if (major*100+minor >= 601)
       {
          /* Windows 7, 8, 10 codepath */
          typedef HANDLE (WINAPI * PowerCreateRequestPtr)(REASON_CONTEXT *context);

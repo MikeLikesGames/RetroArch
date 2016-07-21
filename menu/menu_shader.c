@@ -19,10 +19,11 @@
 #include <compat/strl.h>
 #include <retro_assert.h>
 #include <file/file_path.h>
+#include <string/stdstring.h>
 
 #include "menu_driver.h"
-#include "menu_hash.h"
 #include "menu_shader.h"
+#include "../file_path_special.h"
 #include "../configuration.h"
 #include "../runloop.h"
 #include "../verbosity.h"
@@ -35,8 +36,6 @@
 void menu_shader_manager_init(menu_handle_t *menu)
 {
 #ifdef HAVE_SHADER_MANAGER
-   uint32_t ext_hash;
-   const char *ext             = NULL;
    struct video_shader *shader = NULL;
    config_file_t *conf         = NULL;
    const char *config_path     = NULL;
@@ -51,10 +50,10 @@ void menu_shader_manager_init(menu_handle_t *menu)
 
    if (global)
    {
-      if (*global->path.core_specific_config
+      if (!string_is_empty(global->path.core_specific_config)
             && settings->core_specific_config)
          config_path = global->path.core_specific_config;
-      else if (*global->path.config)
+      else if (!string_is_empty(global->path.config))
          config_path = global->path.config;
    }
 
@@ -62,20 +61,17 @@ void menu_shader_manager_init(menu_handle_t *menu)
     * conflicts on menu.cgp/menu.glslp. */
    if (config_path)
    {
-      fill_pathname_base(menu->default_glslp, config_path,
+      fill_pathname_base_ext(menu->default_glslp, config_path,
+            file_path_str(FILE_PATH_GLSLP_EXTENSION),
             sizeof(menu->default_glslp));
-      path_remove_extension(menu->default_glslp);
-      strlcat(menu->default_glslp, ".glslp", sizeof(menu->default_glslp));
 
-      fill_pathname_base(menu->default_cgp, config_path,
+      fill_pathname_base_ext(menu->default_cgp, config_path,
+            file_path_str(FILE_PATH_CGP_EXTENSION),
             sizeof(menu->default_cgp));
-      path_remove_extension(menu->default_cgp);
-      strlcat(menu->default_cgp, ".cgp", sizeof(menu->default_cgp));
 
-      fill_pathname_base(menu->default_slangp, config_path,
+      fill_pathname_base_ext(menu->default_slangp, config_path,
+            file_path_str(FILE_PATH_SLANGP_EXTENSION),
             sizeof(menu->default_slangp));
-      path_remove_extension(menu->default_slangp);
-      strlcat(menu->default_slangp, ".slangp", sizeof(menu->default_slangp));
    }
    else
    {
@@ -87,14 +83,12 @@ void menu_shader_manager_init(menu_handle_t *menu)
             sizeof(menu->default_slangp));
    }
 
-   ext      = path_get_extension(settings->path.shader);
-   ext_hash = menu_hash_calculate(ext);
-
-   switch (ext_hash)
+   switch (msg_hash_to_file_type(msg_hash_calculate(
+               path_get_extension(settings->path.shader))))
    {
-      case MENU_VALUE_GLSLP:
-      case MENU_VALUE_CGP:
-      case MENU_VALUE_SLANGP:
+      case FILE_TYPE_SHADER_PRESET_GLSLP:
+      case FILE_TYPE_SHADER_PRESET_CGP:
+      case FILE_TYPE_SHADER_PRESET_SLANGP:
          conf = config_file_new(settings->path.shader);
          if (conf)
          {
@@ -107,9 +101,9 @@ void menu_shader_manager_init(menu_handle_t *menu)
             config_file_free(conf);
          }
          break;
-      case MENU_VALUE_GLSL:
-      case MENU_VALUE_CG:
-      case MENU_VALUE_SLANG:
+      case FILE_TYPE_SHADER_GLSL:
+      case FILE_TYPE_SHADER_CG:
+      case FILE_TYPE_SHADER_SLANG:
          strlcpy(shader->pass[0].source.path, settings->path.shader,
                sizeof(shader->pass[0].source.path));
          shader->passes = 1;
@@ -134,7 +128,8 @@ void menu_shader_manager_init(menu_handle_t *menu)
 
             if (!conf)
             {
-               fill_pathname_join(preset_path, shader_dir, "menu.slangp", sizeof(preset_path));
+               fill_pathname_join(preset_path, shader_dir,
+                     "menu.slangp", sizeof(preset_path));
                conf = config_file_new(preset_path);
             }
 
@@ -254,20 +249,26 @@ void menu_shader_manager_save_preset(
       strlcpy(buffer, basename, sizeof(buffer));
 
       /* Append extension automatically as appropriate. */
-      if (     !strstr(basename, ".cgp") 
-            && !strstr(basename, ".glslp")
-            && !strstr(basename, ".slangp"))
+      if (     !strstr(basename, file_path_str(FILE_PATH_CGP_EXTENSION)) 
+            && !strstr(basename, file_path_str(FILE_PATH_GLSLP_EXTENSION))
+            && !strstr(basename, file_path_str(FILE_PATH_SLANGP_EXTENSION)))
       {
          switch (type)
          {
             case RARCH_SHADER_GLSL:
-               strlcat(buffer, ".glslp", sizeof(buffer));
+               strlcat(buffer,
+                     file_path_str(FILE_PATH_GLSLP_EXTENSION),
+                     sizeof(buffer));
                break;
             case RARCH_SHADER_SLANG:
-               strlcat(buffer, ".slangp", sizeof(buffer));
+               strlcat(buffer,
+                     file_path_str(FILE_PATH_SLANGP_EXTENSION),
+                     sizeof(buffer));
                break;
             case RARCH_SHADER_CG:
-               strlcat(buffer, ".cgp", sizeof(buffer));
+               strlcat(buffer,
+                     file_path_str(FILE_PATH_CGP_EXTENSION),
+                     sizeof(buffer));
                break;
          }
       }
@@ -293,7 +294,7 @@ void menu_shader_manager_save_preset(
       strlcpy(buffer, conf_path, sizeof(buffer));
    }
 
-   if (*global->path.config)
+   if (!string_is_empty(global->path.config))
       fill_pathname_basedir(
             config_directory,
             global->path.config,

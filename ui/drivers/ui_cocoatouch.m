@@ -296,6 +296,7 @@ enum
 
    get_ios_version(&major, &minor);
     
+#if __IPHONE_OS_VERSION_MAX_ALLOWED < 70000
    if ((major < 7) && [event respondsToSelector:@selector(_gsEvent)])
    {
       /* Keyboard event hack for iOS versions prior to iOS 7.
@@ -315,6 +316,7 @@ enum
             break;
       }
    }
+#endif
 }
 
 @end
@@ -689,6 +691,7 @@ const ui_companion_driver_t ui_companion_cocoatouch = {
    ui_companion_cocoatouch_notify_refresh,
    ui_companion_cocoatouch_msg_queue_push,
    ui_companion_cocoatouch_render_messagebox,
+   NULL,
    &ui_browser_window_null,
    &ui_msg_window_null,
    &ui_window_null,

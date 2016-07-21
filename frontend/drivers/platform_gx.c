@@ -21,11 +21,16 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <gccore.h>
+#include <ogcsys.h>
+
 #if defined(HW_RVL) && !defined(IS_SALAMANDER)
 #include <ogc/mutex.h>
 #include <ogc/cond.h>
 #include "../../memory/wii/mem2_manager.h"
 #endif
+
+#include "../../defines/gx_defines.h"
 
 #include <boolean.h>
 
@@ -460,15 +465,15 @@ static int frontend_gx_parse_drive_list(void *data)
 #ifndef IS_SALAMANDER
    file_list_t *list = (file_list_t*)data;
 #ifdef HW_RVL
-   menu_entries_add(list,
-         "sd:/", "", MENU_FILE_DIRECTORY, 0, 0);
-   menu_entries_add(list,
-         "usb:/", "", MENU_FILE_DIRECTORY, 0, 0);
+   menu_entries_append_enum(list,
+         "sd:/", "", MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
+   menu_entries_append_enum(list,
+         "usb:/", "", MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
 #endif
-   menu_entries_add(list,
-         "carda:/", "", MENU_FILE_DIRECTORY, 0, 0);
-   menu_entries_add(list,
-         "cardb:/", "", MENU_FILE_DIRECTORY, 0, 0);
+   menu_entries_append_enum(list,
+         "carda:/", "", MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
+   menu_entries_append_enum(list,
+         "cardb:/", "", MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
 #endif
 
    return 0;
@@ -479,6 +484,24 @@ static void frontend_gx_shutdown(bool unused)
 #ifndef IS_SALAMANDER
    exit(0);
 #endif
+}
+
+static uint64_t frontend_gx_get_mem_total(void)
+{
+   uint64_t total = SYSMEM1_SIZE;
+#if defined(HW_RVL) && !defined(IS_SALAMANDER)
+   total += gx_mem2_total();
+#endif
+   return total;
+}
+
+static uint64_t frontend_gx_get_mem_used(void)
+{
+   uint64_t total = SYSMEM1_SIZE - SYS_GetArena1Size();
+#if defined(HW_RVL) && !defined(IS_SALAMANDER)
+   total += gx_mem2_used();
+#endif
+   return total;
 }
 
 frontend_ctx_driver_t frontend_ctx_gx = {
@@ -501,6 +524,11 @@ frontend_ctx_driver_t frontend_ctx_gx = {
    frontend_gx_get_architecture,
    NULL,                            /* get_powerstate */
    frontend_gx_parse_drive_list,
-   NULL,                            /* get_mem_total */
+   frontend_gx_get_mem_total,
+   frontend_gx_get_mem_used,
+   NULL,                            /* install_signal_handler */
+   NULL,                            /* get_sighandler_state */
+   NULL,                            /* set_sighandler_state */
+   NULL,                            /* destroy_signal_handler_state */
    "gx",
 };

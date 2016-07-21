@@ -167,6 +167,10 @@ VIDEO CONTEXT
 
 #ifdef HAVE_VULKAN
 #include "../gfx/common/vulkan_common.c"
+#include "../libretro-common/vulkan/vulkan_symbol_wrapper.c"
+#ifdef HAVE_VULKAN_KHR_DISPLAY
+#include "../gfx/drivers_context/khr_display_ctx.c"
+#endif
 #endif
 
 #if defined(HAVE_KMS)
@@ -255,6 +259,8 @@ VIDEO DRIVER
 
 #include "../libretro-common/gfx/math/matrix_4x4.c"
 #include "../libretro-common/gfx/math/matrix_3x3.c"
+#include "../libretro-common/gfx/math/vector_2.c"
+#include "../libretro-common/gfx/math/vector_3.c"
 
 #if defined(GEKKO)
 #ifdef HW_RVL
@@ -273,6 +279,10 @@ VIDEO DRIVER
 
 #ifdef HAVE_VULKAN
 #include "../gfx/drivers/vulkan.c"
+#endif
+
+#if defined(HAVE_PLAIN_DRM)
+#include "../gfx/drivers/drm_gfx.c"
 #endif
 
 #ifdef HAVE_OPENGL
@@ -653,6 +663,7 @@ FILE
 ============================================================ */
 #include "../libretro-common/file/file_path.c"
 #include "../file_path_special.c"
+#include "../file_path_str.c"
 #include "../libretro-common/lists/dir_list.c"
 #include "../libretro-common/lists/string_list.c"
 #include "../libretro-common/lists/file_list.c"
@@ -711,6 +722,8 @@ FRONTEND
 #include "../frontend/drivers/platform_qnx.c"
 #elif defined(__linux__)
 #include "../frontend/drivers/platform_linux.c"
+#elif defined(BSD) && !defined(__MACH__)
+#include "../frontend/drivers/platform_bsd.c"
 #endif
 #include "../frontend/drivers/platform_null.c"
 
@@ -755,7 +768,6 @@ RETROARCH
 #include "../retroarch.c"
 #include "../runloop.c"
 #include "../libretro-common/queues/task_queue.c"
-#include "../tasks/tasks_internal.c"
 
 #include "../msg_hash.c"
 #ifdef HAVE_LANGEXTRA
@@ -846,7 +858,6 @@ MENU
 ============================================================ */
 #ifdef HAVE_MENU
 #include "../menu/menu_driver.c"
-#include "../menu/menu_hash.c"
 #include "../menu/menu_input.c"
 #include "../menu/menu_entry.c"
 #include "../menu/menu_entries.c"
@@ -865,6 +876,7 @@ MENU
 #include "../menu/cbs/menu_cbs_deferred_push.c"
 #include "../menu/cbs/menu_cbs_scan.c"
 #include "../menu/cbs/menu_cbs_get_value.c"
+#include "../menu/cbs/menu_cbs_label.c"
 #include "../menu/cbs/menu_cbs_up.c"
 #include "../menu/cbs/menu_cbs_down.c"
 #include "../menu/cbs/menu_cbs_contentlist_switch.c"
@@ -873,21 +885,6 @@ MENU
 #include "../menu/menu_display.c"
 #include "../menu/menu_displaylist.c"
 #include "../menu/menu_animation.c"
-
-#ifdef HAVE_LANGEXTRA
-#include "../menu/intl/menu_hash_de.c"
-#include "../menu/intl/menu_hash_es.c"
-#include "../menu/intl/menu_hash_eo.c"
-#include "../menu/intl/menu_hash_fr.c"
-#include "../menu/intl/menu_hash_it.c"
-#include "../menu/intl/menu_hash_nl.c"
-#include "../menu/intl/menu_hash_pl.c"
-#include "../menu/intl/menu_hash_pt.c"
-#ifdef HAVE_UTF8
-#include "../menu/intl/menu_hash_ru.c"
-#endif
-#endif
-#include "../menu/intl/menu_hash_us.c"
 
 #include "../menu/drivers/null.c"
 #include "../menu/drivers/menu_generic.c"

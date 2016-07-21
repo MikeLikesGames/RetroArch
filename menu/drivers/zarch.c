@@ -44,7 +44,6 @@
 #include "../menu_entry.h"
 #include "../menu_display.h"
 #include "../menu_navigation.h"
-#include "../menu_hash.h"
 #include "../../retroarch.h"
 
 #include "../../gfx/font_driver.h"
@@ -210,7 +209,7 @@ static bool zarch_zui_check_button_down(zui_t *zui,
    hitbox.y1   = y1;
    hitbox.y2   = y2;
 
-   if (menu_input_ctl(MENU_INPUT_CTL_CHECK_INSIDE_HITBOX, &hitbox))
+   if (menu_input_mouse_check_vector_inside_hitbox(&hitbox))
       zui->item.hot = id;
 
    if (     zui->item.hot == id 
@@ -234,7 +233,7 @@ static bool zarch_zui_check_button_up(zui_t *zui,
    hitbox.y1   = y1;
    hitbox.y2   = y2;
 
-   if (menu_input_ctl(MENU_INPUT_CTL_CHECK_INSIDE_HITBOX, &hitbox))
+   if (menu_input_mouse_check_vector_inside_hitbox(&hitbox))
       zui->item.hot = id;
 
    if (     zui->item.active == id 
@@ -255,7 +254,7 @@ static unsigned zarch_zui_hash(zui_t *zui, const char *s)
 {
    unsigned hval = zui->hash;
 
-   while(*s!=0)
+   while(*s != 0)
    {
       hval+=*s++;
       hval+=(hval<<10);
@@ -519,13 +518,15 @@ static int zarch_zui_render_lay_root_recent(zui_t *zui, struct zui_tabbed *tabbe
 
       for (i = zui->recent_dlist_first; i < size; ++i)
       {
-         menu_entry_t entry;
+         char rich_label[PATH_MAX_LENGTH] = {0};
+         menu_entry_t entry               = {{0}};
 
          menu_entry_get(&entry, 0, i, NULL, true);
+         menu_entry_get_rich_label(i, rich_label, sizeof(rich_label));
 
          if (zarch_zui_list_item(zui, tabbed, 0, 
                   tabbed->tabline_size + j * ZUI_ITEM_SIZE_PX,
-                  entry.path, i, entry.value, gamepad_index == (signed)i))
+                  rich_label, i, entry.value, gamepad_index == (signed)i))
          {
             if (menu_entry_action(&entry, i, MENU_ACTION_OK))
                return 1;
@@ -1007,7 +1008,7 @@ static void *zarch_init(void **userdata)
 
    if (!string_is_empty(settings->path.menu_wallpaper))
       task_push_image_load(settings->path.menu_wallpaper,
-            "cb_menu_wallpaper",
+            MENU_ENUM_LABEL_CB_MENU_WALLPAPER,
             menu_display_handle_wallpaper_upload, NULL);
 
    matrix_4x4_ortho(&zui->mvp, 0, 1, 1, 0, 0, 1);
@@ -1092,7 +1093,8 @@ static void zarch_context_reset(void *data)
    zarch_context_bg_destroy(zui);
 
    task_push_image_load(settings->path.menu_wallpaper,
-         "cb_menu_wallpaper", menu_display_handle_wallpaper_upload, NULL);
+         MENU_ENUM_LABEL_CB_MENU_WALLPAPER,
+         menu_display_handle_wallpaper_upload, NULL);
 
    menu_display_allocate_white_texture();
 
@@ -1129,10 +1131,11 @@ static bool zarch_menu_init_list(void *data)
    file_list_t *selection_buf = menu_entries_get_selection_buf_ptr(0);
 
    strlcpy(info.label,
-         menu_hash_to_str(MENU_VALUE_HISTORY_TAB), sizeof(info.label));
+         msg_hash_to_str(MENU_ENUM_LABEL_HISTORY_TAB), sizeof(info.label));
+   info.enum_idx = MENU_ENUM_LABEL_HISTORY_TAB;
 
-   menu_entries_add(menu_stack,
-         info.path, info.label, info.type, info.flags, 0);
+   menu_entries_append_enum(menu_stack,
+         info.path, info.label, MENU_ENUM_LABEL_HISTORY_TAB, info.type, info.flags, 0);
 
    command_event(CMD_EVENT_HISTORY_INIT, NULL);
 

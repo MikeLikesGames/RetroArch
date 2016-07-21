@@ -29,6 +29,50 @@
 
 RETRO_BEGIN_DECLS
 
+enum materialui_color_theme
+{
+   MATERIALUI_THEME_BLUE = 0,
+   MATERIALUI_THEME_BLUE_GREY,
+   MATERIALUI_THEME_DARK_BLUE,
+   MATERIALUI_THEME_GREEN,
+   MATERIALUI_THEME_RED,
+   MATERIALUI_THEME_YELLOW,
+   MATERIALUI_THEME_NVIDIA_SHIELD,
+   MATERIALUI_THEME_LAST
+};
+
+enum xmb_color_theme
+{
+   XMB_THEME_LEGACY_RED  = 0,
+   XMB_THEME_DARK_PURPLE,
+   XMB_THEME_MIDNIGHT_BLUE,
+   XMB_THEME_GOLDEN,
+   XMB_THEME_ELECTRIC_BLUE,
+   XMB_THEME_APPLE_GREEN,
+   XMB_THEME_UNDERSEA,
+   XMB_THEME_VOLCANIC_RED,
+   XMB_THEME_DARK,
+   XMB_THEME_WALLPAPER,
+   XMB_THEME_LAST
+};
+
+enum xmb_icon_theme
+{
+   XMB_ICON_THEME_MONOCHROME = 0,
+   XMB_ICON_THEME_FLATUI,
+   XMB_ICON_THEME_RETROACTIVE,
+   XMB_ICON_THEME_PIXEL,
+   XMB_ICON_THEME_CUSTOM
+};
+
+enum xmb_shader_pipeline
+{
+   XMB_SHADER_PIPELINE_WALLPAPER = 0,
+   XMB_SHADER_PIPELINE_SIMPLE_RIBBON,
+   XMB_SHADER_PIPELINE_RIBBON,
+   XMB_SHADER_PIPELINE_LAST
+};
+
 enum menu_display_prim_type
 {
    MENU_DISPLAY_PRIM_NONE = 0,
@@ -201,9 +245,14 @@ void menu_display_draw_cursor(
 void menu_display_draw_text(const char *msg, int width, int height, 
       struct font_params *params);
 
+bool menu_display_shader_pipeline_active(void);
+
 void menu_display_set_alpha(float *color, float alpha_value);
 
 bool menu_display_font(enum application_special_type type);
+
+void menu_display_reset_textures_list(const char *texture_path, const char *iconpath,
+      uintptr_t *item);
 
 extern uintptr_t menu_display_white_texture;
 

@@ -22,7 +22,6 @@
 #include "../menu_display.h"
 #include "../menu_setting.h"
 #include "../menu_shader.h"
-#include "../menu_hash.h"
 
 #include "../../core_info.h"
 #include "../../managers/core_option_manager.h"
@@ -283,11 +282,14 @@ static int action_start_playlist_association(unsigned type, const char *label)
    found   = string_list_find_elem(stnames, path);
 
    if (found)
-      string_list_set(stcores, found-1, "DETECT");
+      string_list_set(stcores, found-1,
+            file_path_str(FILE_PATH_DETECT));
 
-   string_list_join_concat(new_playlist_cores, sizeof(new_playlist_cores), stcores, ";");
+   string_list_join_concat(new_playlist_cores,
+         sizeof(new_playlist_cores), stcores, ";");
 
-   strlcpy(settings->playlist_cores, new_playlist_cores, sizeof(settings->playlist_cores));
+   strlcpy(settings->playlist_cores,
+         new_playlist_cores, sizeof(settings->playlist_cores));
 
    string_list_free(stcores);
    string_list_free(stnames);
@@ -320,36 +322,38 @@ static int action_start_lookup_setting(unsigned type, const char *label)
    return menu_setting_set(type, label, MENU_ACTION_START, false);
 }
 
-static int menu_cbs_init_bind_start_compare_label(menu_file_list_cbs_t *cbs,
-      uint32_t hash)
+static int menu_cbs_init_bind_start_compare_label(menu_file_list_cbs_t *cbs)
 {
-   switch (hash)
+   if (cbs->enum_idx != MSG_UNKNOWN)
    {
-      case MENU_LABEL_REMAP_FILE_LOAD:
-         BIND_ACTION_START(cbs, action_start_remap_file_load);
-         break;
-      case MENU_LABEL_VIDEO_FILTER:
-         BIND_ACTION_START(cbs, action_start_video_filter_file_load);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_PASS:
-         BIND_ACTION_START(cbs, action_start_shader_pass);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_SCALE_PASS:
-         BIND_ACTION_START(cbs, action_start_shader_scale_pass);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_FILTER_PASS:
-         BIND_ACTION_START(cbs, action_start_shader_filter_pass);
-         break;
-      case MENU_LABEL_VIDEO_SHADER_NUM_PASSES:
-         BIND_ACTION_START(cbs, action_start_shader_num_passes);
-         break;
-      case MENU_LABEL_CHEAT_NUM_PASSES:
-         BIND_ACTION_START(cbs, action_start_cheat_num_passes);
-         break;
-      case MENU_LABEL_SCREEN_RESOLUTION:
-         BIND_ACTION_START(cbs, action_start_video_resolution);
-      default:
-         return -1;
+      switch (cbs->enum_idx)
+      {
+         case MENU_ENUM_LABEL_REMAP_FILE_LOAD:
+            BIND_ACTION_START(cbs, action_start_remap_file_load);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_FILTER:
+            BIND_ACTION_START(cbs, action_start_video_filter_file_load);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_PASS:
+            BIND_ACTION_START(cbs, action_start_shader_pass);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_SCALE_PASS:
+            BIND_ACTION_START(cbs, action_start_shader_scale_pass);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_FILTER_PASS:
+            BIND_ACTION_START(cbs, action_start_shader_filter_pass);
+            break;
+         case MENU_ENUM_LABEL_VIDEO_SHADER_NUM_PASSES:
+            BIND_ACTION_START(cbs, action_start_shader_num_passes);
+            break;
+         case MENU_ENUM_LABEL_CHEAT_NUM_PASSES:
+            BIND_ACTION_START(cbs, action_start_cheat_num_passes);
+            break;
+         case MENU_ENUM_LABEL_SCREEN_RESOLUTION:
+            BIND_ACTION_START(cbs, action_start_video_resolution);
+         default:
+            return -1;
+      }
    }
 
    return 0;
@@ -402,16 +406,14 @@ static int menu_cbs_init_bind_start_compare_type(menu_file_list_cbs_t *cbs,
 }
 
 int menu_cbs_init_bind_start(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash)
+      const char *path, const char *label, unsigned type, size_t idx)
 {
    if (!cbs)
       return -1;
 
    BIND_ACTION_START(cbs, action_start_lookup_setting);
    
-   if (menu_cbs_init_bind_start_compare_label(cbs, label_hash) == 0)
+   if (menu_cbs_init_bind_start_compare_label(cbs) == 0)
       return 0;
 
    if (menu_cbs_init_bind_start_compare_type(cbs, type) == 0)

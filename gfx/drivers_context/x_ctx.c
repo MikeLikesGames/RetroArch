@@ -23,6 +23,7 @@
 
 #include "../../driver.h"
 
+#include "../../frontend/frontend_driver.h"
 #include "../common/gl_common.h"
 #include "../common/x11_common.h"
 
@@ -124,7 +125,7 @@ static void gfx_ctx_x_destroy_resources(gfx_ctx_x_data_t *x)
       }
    }
 
-   if (g_x11_win)
+   if (g_x11_win && g_x11_dpy)
    {
       /* Save last used monitor for later. */
       x11_save_last_used_monitor(DefaultRootWindow(g_x11_dpy));
@@ -433,7 +434,7 @@ static bool gfx_ctx_x_set_video_mode(void *data,
    settings_t *settings    = config_get_ptr();
    gfx_ctx_x_data_t *x = (gfx_ctx_x_data_t*)data;
 
-   x11_install_sighandlers();
+   frontend_driver_install_signal_handler();
 
    if (!x)
       return false;

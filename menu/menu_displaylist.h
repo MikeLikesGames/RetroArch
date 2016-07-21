@@ -22,6 +22,8 @@
 #include <retro_common_api.h>
 #include <lists/file_list.h>
 
+#include "../msg_hash.h"
+
 #ifndef COLLECTION_SIZE
 #define COLLECTION_SIZE 99999
 #endif
@@ -30,16 +32,21 @@ RETRO_BEGIN_DECLS
 
 enum menu_displaylist_parse_type
 {
-   PARSE_NONE           = (1 << 0),
-   PARSE_GROUP          = (1 << 1),
-   PARSE_ACTION         = (1 << 2),
-   PARSE_ONLY_INT       = (1 << 3),
-   PARSE_ONLY_UINT      = (1 << 4),
-   PARSE_ONLY_BOOL      = (1 << 5),
-   PARSE_ONLY_FLOAT     = (1 << 6),
-   PARSE_ONLY_BIND      = (1 << 7),
-   PARSE_ONLY_GROUP     = (1 << 8),
-   PARSE_SUB_GROUP      = (1 << 9) 
+   PARSE_NONE                = (1 << 0),
+   PARSE_GROUP               = (1 << 1),
+   PARSE_ACTION              = (1 << 2),
+   PARSE_ONLY_INT            = (1 << 3),
+   PARSE_ONLY_UINT           = (1 << 4),
+   PARSE_ONLY_BOOL           = (1 << 5),
+   PARSE_ONLY_FLOAT          = (1 << 6),
+   PARSE_ONLY_BIND           = (1 << 7),
+   PARSE_ONLY_GROUP          = (1 << 8),
+   PARSE_ONLY_STRING         = (1 << 9),
+   PARSE_ONLY_PATH           = (1 << 10),
+   PARSE_ONLY_STRING_OPTIONS = (1 << 11),
+   PARSE_ONLY_HEX            = (1 << 12),
+   PARSE_ONLY_DIR            = (1 << 13),
+   PARSE_SUB_GROUP           = (1 << 14) 
 };
 
 enum menu_displaylist_ctl_state
@@ -50,14 +57,18 @@ enum menu_displaylist_ctl_state
    DISPLAYLIST_HELP_SCREEN_LIST,
    DISPLAYLIST_MAIN_MENU,
    DISPLAYLIST_GENERIC,
-   DISPLAYLIST_SETTING,
-   DISPLAYLIST_SETTINGS,
+   DISPLAYLIST_SETTING_ENUM,
    DISPLAYLIST_SETTINGS_ALL,
    DISPLAYLIST_HORIZONTAL,
    DISPLAYLIST_HORIZONTAL_CONTENT_ACTIONS,
    DISPLAYLIST_HISTORY,
    DISPLAYLIST_PLAYLIST_COLLECTION,
    DISPLAYLIST_DEFAULT,
+   DISPLAYLIST_FILE_BROWSER_SELECT_DIR,
+   DISPLAYLIST_FILE_BROWSER_SCAN_DIR,
+   DISPLAYLIST_FILE_BROWSER_SELECT_FILE,
+   DISPLAYLIST_FILE_BROWSER_SELECT_CORE,
+   DISPLAYLIST_FILE_BROWSER_SELECT_COLLECTION,
    DISPLAYLIST_CORES,
    DISPLAYLIST_CORES_SUPPORTED,
    DISPLAYLIST_CORES_COLLECTION_SUPPORTED,
@@ -95,8 +106,27 @@ enum menu_displaylist_ctl_state
    DISPLAYLIST_ACHIEVEMENT_LIST,
    DISPLAYLIST_USER_BINDS_LIST,
    DISPLAYLIST_ACCOUNTS_LIST,
+   DISPLAYLIST_DRIVER_SETTINGS_LIST,
+   DISPLAYLIST_VIDEO_SETTINGS_LIST,
+   DISPLAYLIST_CONFIGURATION_SETTINGS_LIST,
+   DISPLAYLIST_SAVING_SETTINGS_LIST,
+   DISPLAYLIST_LOGGING_SETTINGS_LIST,
+   DISPLAYLIST_FRAME_THROTTLE_SETTINGS_LIST,
+   DISPLAYLIST_REWIND_SETTINGS_LIST,
+   DISPLAYLIST_AUDIO_SETTINGS_LIST,
+   DISPLAYLIST_CORE_SETTINGS_LIST,
    DISPLAYLIST_INPUT_SETTINGS_LIST,
    DISPLAYLIST_INPUT_HOTKEY_BINDS_LIST,
+   DISPLAYLIST_ONSCREEN_OVERLAY_SETTINGS_LIST,
+   DISPLAYLIST_ONSCREEN_DISPLAY_SETTINGS_LIST,
+   DISPLAYLIST_MENU_SETTINGS_LIST,
+   DISPLAYLIST_USER_INTERFACE_SETTINGS_LIST,
+   DISPLAYLIST_RETRO_ACHIEVEMENTS_SETTINGS_LIST,
+   DISPLAYLIST_UPDATER_SETTINGS_LIST,
+   DISPLAYLIST_NETWORK_SETTINGS_LIST,
+   DISPLAYLIST_USER_SETTINGS_LIST,
+   DISPLAYLIST_DIRECTORY_SETTINGS_LIST,
+   DISPLAYLIST_PRIVACY_SETTINGS_LIST,
    DISPLAYLIST_PLAYLIST_SETTINGS_LIST,
    DISPLAYLIST_ACCOUNTS_CHEEVOS_LIST,
    DISPLAYLIST_LOAD_CONTENT_LIST,
@@ -113,6 +143,8 @@ enum menu_displaylist_ctl_state
    DISPLAYLIST_ARCHIVE_ACTION,
    DISPLAYLIST_ARCHIVE_ACTION_DETECT_CORE,
    DISPLAYLIST_CORE_CONTENT,
+   DISPLAYLIST_CORE_CONTENT_DIRS,
+   DISPLAYLIST_CORE_CONTENT_DIRS_SUBDIR,
    DISPLAYLIST_PROCESS,
    DISPLAYLIST_PUSH_ONTO_STACK,
    DISPLAYLIST_PENDING_CLEAR
@@ -138,6 +170,7 @@ typedef struct menu_displaylist_info
    unsigned type_default;
    size_t directory_ptr;
    unsigned flags;
+   enum msg_hash_enums enum_idx;
    rarch_setting_t *setting;
 } menu_displaylist_info_t;
 
@@ -146,6 +179,7 @@ typedef struct menu_displaylist_ctx_parse_entry
    void *data;
    menu_displaylist_info_t *info;
    const char *info_label;
+   enum msg_hash_enums enum_idx;
    enum menu_displaylist_parse_type parse_type;
    bool add_empty_entry;
 } menu_displaylist_ctx_parse_entry_t;
@@ -155,6 +189,8 @@ typedef struct menu_displaylist_ctx_entry
    file_list_t *stack;
    file_list_t *list;
 } menu_displaylist_ctx_entry_t;
+
+void menu_displaylist_reset_filebrowser(void);
 
 bool menu_displaylist_ctl(enum menu_displaylist_ctl_state type, void *data);
 

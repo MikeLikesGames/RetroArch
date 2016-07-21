@@ -19,6 +19,7 @@
 #include <queues/message_queue.h>
 #include <retro_miscellaneous.h>
 #include <formats/image.h>
+#include <file/file_path.h>
 #include <string/stdstring.h>
 
 #include "../config.def.h"
@@ -26,6 +27,7 @@
 #include "../configuration.h"
 #include "../runloop.h"
 #include "../core.h"
+#include "../gfx/video_driver.h"
 #include "../gfx/video_thread_wrapper.h"
 #include "../verbosity.h"
 
@@ -291,9 +293,7 @@ bool menu_display_libretro(void)
 
    if (menu_display_libretro_running())
    {
-      bool libretro_input_is_blocked = input_driver_is_libretro_input_blocked();
-
-      if (!libretro_input_is_blocked)
+      if (!input_driver_is_libretro_input_blocked())
          input_driver_set_libretro_input_blocked();
 
       core_run();
@@ -415,9 +415,9 @@ void menu_display_unset_framebuffer_dirty_flag(void)
 
 float menu_display_get_dpi(void)
 {
-   settings_t *settings = config_get_ptr();
    gfx_ctx_metrics_t metrics;
-   float dpi = menu_dpi_override_value;
+   settings_t *settings = config_get_ptr();
+   float            dpi = menu_dpi_override_value;
 
    if (!settings)
       return true;
@@ -478,6 +478,16 @@ void menu_display_draw(menu_display_ctx_draw_t *draw)
    menu_disp->draw(draw);
 }
 
+bool menu_display_shader_pipeline_active(void)
+{
+   settings_t *settings          = config_get_ptr();
+   if (!string_is_equal(menu_driver_ident(), "xmb"))
+      return false;
+   if (settings->menu.xmb.shader_pipeline == XMB_SHADER_PIPELINE_WALLPAPER)
+      return false;
+   return true;
+}
+
 void menu_display_draw_pipeline(menu_display_ctx_draw_t *draw)
 {
    if (!menu_disp || !draw || !menu_disp->draw_pipeline)
@@ -490,6 +500,8 @@ void menu_display_draw_bg(menu_display_ctx_draw_t *draw)
    static struct video_coords coords;
    const float *new_vertex       = NULL;
    const float *new_tex_coord    = NULL;
+   bool add_opacity_to_wallpaper = false;
+   settings_t *settings          = config_get_ptr();
    if (!menu_disp || !draw)
       return;
 
@@ -508,6 +520,15 @@ void menu_display_draw_bg(menu_display_ctx_draw_t *draw)
    coords.color         = (const float*)draw->color;
 
    draw->coords      = &coords;
+
+   if (!menu_display_libretro_running() && !menu_display_shader_pipeline_active())
+      add_opacity_to_wallpaper = true;
+   if (string_is_equal(menu_driver_ident(), "xmb") 
+         && settings->menu.xmb.menu_color_theme == XMB_THEME_WALLPAPER)
+      add_opacity_to_wallpaper = true;
+
+   if (add_opacity_to_wallpaper)
+      menu_display_set_alpha(draw->color, settings->menu.wallpaper.opacity);
 
    if (!draw->texture)
       draw->texture     = menu_display_white_texture;
@@ -597,6 +618,9 @@ void menu_display_allocate_white_texture(void)
    ti.width  = 1;
    ti.height = 1;
    ti.pixels = (uint32_t*)&white_data;
+
+   if (menu_display_white_texture)
+      video_driver_texture_unload(&menu_display_white_texture);
 
    video_driver_texture_load(&ti,
          TEXTURE_FILTER_NEAREST, &menu_display_white_texture);
@@ -782,4 +806,22 @@ void menu_display_set_alpha(float *color, float alpha_value)
    if (!color)
       return;
    color[3] = color[7] = color[11] = color[15] = alpha_value;
+}
+
+void menu_display_reset_textures_list(const char *texture_path, const char *iconpath,
+      uintptr_t *item)
+{
+   struct texture_image ti     = {0};
+   char path[PATH_MAX_LENGTH]  = {0};
+
+   if (texture_path != NULL)
+      fill_pathname_join(path, iconpath, texture_path, sizeof(path));
+
+   if (string_is_empty(path) || !path_file_exists(path))
+      return;
+
+   image_texture_load(&ti, path);
+   video_driver_texture_load(&ti,
+         TEXTURE_FILTER_MIPMAP_LINEAR, item);
+   image_texture_free(&ti);
 }

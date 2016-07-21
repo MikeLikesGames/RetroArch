@@ -354,7 +354,17 @@ static void frontend_darwin_get_environment_settings(int *argc, char *argv[],
 
    strlcat(home_dir_buf, "/RetroArch", sizeof(home_dir_buf));
    fill_pathname_join(g_defaults.dir.shader, home_dir_buf, "shaders_glsl", sizeof(g_defaults.dir.shader));
+#if TARGET_OS_IPHONE
+    int major, minor;
+    get_ios_version(&major, &minor);
+    if (major >= 10 ) {
+        fill_pathname_join(g_defaults.dir.core, bundle_path_buf, "modules", sizeof(g_defaults.dir.core));
+    } else {
+        fill_pathname_join(g_defaults.dir.core, home_dir_buf, "cores", sizeof(g_defaults.dir.core));
+    }
+#else
    fill_pathname_join(g_defaults.dir.core, home_dir_buf, "cores", sizeof(g_defaults.dir.core));
+#endif
    fill_pathname_join(g_defaults.dir.core_info, home_dir_buf, "info", sizeof(g_defaults.dir.core_info));
    fill_pathname_join(g_defaults.dir.overlay, home_dir_buf, "overlays", sizeof(g_defaults.dir.overlay));
    fill_pathname_join(g_defaults.dir.autoconfig, home_dir_buf, "autoconfig", sizeof(g_defaults.dir.autoconfig));
@@ -362,7 +372,8 @@ static void frontend_darwin_get_environment_settings(int *argc, char *argv[],
    fill_pathname_join(g_defaults.dir.assets, home_dir_buf, "assets", sizeof(g_defaults.dir.assets));
    fill_pathname_join(g_defaults.dir.system, home_dir_buf, "system", sizeof(g_defaults.dir.system));
    fill_pathname_join(g_defaults.dir.menu_config, home_dir_buf, "config", sizeof(g_defaults.dir.menu_config));
-   fill_pathname_join(g_defaults.path.config, g_defaults.dir.menu_config, "retroarch.cfg", sizeof(g_defaults.path.config));
+   fill_pathname_join(g_defaults.path.config, g_defaults.dir.menu_config,
+        file_path_str(FILE_PATH_MAIN_CONFIG), sizeof(g_defaults.path.config));
    fill_pathname_join(g_defaults.dir.remap, g_defaults.dir.menu_config, "remaps", sizeof(g_defaults.dir.remap));
    fill_pathname_join(g_defaults.dir.database, home_dir_buf, "database/rdb", sizeof(g_defaults.dir.database));
    fill_pathname_join(g_defaults.dir.cursor, home_dir_buf, "database/cursors", sizeof(g_defaults.dir.cursor));
@@ -387,7 +398,8 @@ static void frontend_darwin_get_environment_settings(int *argc, char *argv[],
    fill_pathname_join(g_defaults.dir.playlist, application_data, "playlists", sizeof(g_defaults.dir.playlist));
    fill_pathname_join(g_defaults.dir.thumbnails, application_data, "thumbnails", sizeof(g_defaults.dir.thumbnails));
    fill_pathname_join(g_defaults.dir.menu_config, application_data, "config", sizeof(g_defaults.dir.menu_config));
-   fill_pathname_join(g_defaults.path.config, g_defaults.dir.menu_config, "retroarch.cfg", sizeof(g_defaults.path.config));
+   fill_pathname_join(g_defaults.path.config, g_defaults.dir.menu_config,
+        file_path_str(FILE_PATH_MAIN_CONFIG), sizeof(g_defaults.path.config));
    fill_pathname_join(g_defaults.dir.remap, g_defaults.dir.menu_config, "remaps", sizeof(g_defaults.dir.remap));
    fill_pathname_join(g_defaults.dir.core_assets, application_data, "downloads", sizeof(g_defaults.dir.core_assets));
    fill_pathname_join(g_defaults.dir.screenshot, application_data, "screenshots", sizeof(g_defaults.dir.screenshot));
@@ -406,9 +418,6 @@ static void frontend_darwin_get_environment_settings(int *argc, char *argv[],
 
 #if TARGET_OS_IPHONE
     char assets_zip_path[PATH_MAX_LENGTH];
-    int major, minor;
-
-    get_ios_version(&major, &minor);
     if (major > 8)
        strlcpy(g_defaults.path.buildbot_server_url, "http://buildbot.libretro.com/nightly/apple/ios9/latest/", sizeof(g_defaults.path.buildbot_server_url));
 
@@ -650,10 +659,10 @@ static int frontend_darwin_parse_drive_list(void *data)
 
    CFSearchPathForDirectoriesInDomains(CFDocumentDirectory, CFUserDomainMask, 1, home_dir_buf, sizeof(home_dir_buf));
 
-   menu_entries_add(list,
-         home_dir_buf, "", MENU_FILE_DIRECTORY, 0, 0);
-   menu_entries_add(list, "/", "",
-         MENU_FILE_DIRECTORY, 0, 0);
+   menu_entries_append_enum(list,
+         home_dir_buf, "", MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
+   menu_entries_append_enum(list, "/", "",
+         MSG_UNKNOWN, FILE_TYPE_DIRECTORY, 0, 0);
 
    ret = 0;
 
@@ -663,6 +672,44 @@ static int frontend_darwin_parse_drive_list(void *data)
 #endif
 
    return ret;
+}
+
+static uint64_t frontend_darwin_get_mem_total(void)
+{
+#if defined(OSX)
+    uint64_t size;
+    int mib[2]     = { CTL_HW, HW_MEMSIZE };
+    u_int namelen  = sizeof(mib) / sizeof(mib[0]);
+    size_t len     = sizeof(size);
+    
+    if (sysctl(mib, namelen, &size, &len, NULL, 0) < 0)
+        return 0;
+    return size;
+#else
+    return 0;
+#endif
+}
+
+static uint64_t frontend_darwin_get_mem_used(void)
+{
+#if defined(OSX) && !defined(OSX_PPC)
+    vm_size_t page_size;
+    vm_statistics64_data_t vm_stats;
+    mach_port_t mach_port        = mach_host_self();
+    mach_msg_type_number_t count = sizeof(vm_stats) / sizeof(natural_t);
+    
+    if (KERN_SUCCESS == host_page_size(mach_port, &page_size) &&
+        KERN_SUCCESS == host_statistics64(mach_port, HOST_VM_INFO,
+                                          (host_info64_t)&vm_stats, &count))
+    {
+        
+        long long used_memory = ((int64_t)vm_stats.active_count +
+                                 (int64_t)vm_stats.inactive_count +
+                                 (int64_t)vm_stats.wire_count) *  (int64_t)page_size;
+        return used_memory;
+    }
+#endif
+    return 0;
 }
 
 frontend_ctx_driver_t frontend_ctx_darwin = {
@@ -681,6 +728,11 @@ frontend_ctx_driver_t frontend_ctx_darwin = {
    frontend_darwin_get_architecture,
    frontend_darwin_get_powerstate,
    frontend_darwin_parse_drive_list,
-   NULL,                         /* get_mem_total */
+   frontend_darwin_get_mem_total,
+   frontend_darwin_get_mem_used,
+   NULL,                         /* install_signal_handler */
+   NULL,                         /* get_sighandler_state */
+   NULL,                         /* set_sighandler_state */
+   NULL,                         /* destroy_signal_handler_state */
    "darwin",
 };

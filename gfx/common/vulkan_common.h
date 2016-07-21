@@ -82,7 +82,8 @@ enum vulkan_wsi_type
    VULKAN_WSI_ANDROID,
    VULKAN_WSI_WIN32,
    VULKAN_WSI_XCB,
-   VULKAN_WSI_XLIB
+   VULKAN_WSI_XLIB,
+   VULKAN_WSI_DISPLAY
 };
 
 typedef struct vulkan_context
@@ -107,6 +108,11 @@ typedef struct vulkan_context
    VkFormat swapchain_format;
 
    slock_t *queue_lock;
+   retro_vulkan_destroy_device_t destroy_device;
+
+#ifdef VULKAN_DEBUG
+   VkDebugReportCallbackEXT debug_callback;
+#endif
 
    /* Used by screenshot to get blits with correct colorspace. */
    bool swapchain_is_srgb;
@@ -119,6 +125,12 @@ typedef struct gfx_ctx_vulkan_data
    VkSwapchainKHR swapchain;
    bool need_new_swapchain;
 } gfx_ctx_vulkan_data_t;
+
+struct vulkan_display_surface_info
+{
+   unsigned width;
+   unsigned height;
+};
 
 struct vk_color
 {
@@ -158,6 +170,7 @@ struct vk_texture
    VkImageLayout layout;
    enum vk_texture_type type;
    bool default_smooth;
+   bool need_manual_cache_management;
 };
 
 struct vk_buffer
@@ -349,6 +362,7 @@ typedef struct vk
       const struct retro_vulkan_image *image;
       const VkSemaphore *semaphores;
       uint32_t num_semaphores;
+      VkSemaphore signal_semaphore;
 
       VkPipelineStageFlags *wait_dst_stages;
 
@@ -358,8 +372,10 @@ typedef struct vk
 
       unsigned last_width;
       unsigned last_height;
+      uint32_t src_queue_family;
 
       bool enable;
+      bool valid_semaphore;
    } hw;
 
    struct
@@ -391,7 +407,17 @@ struct vk_texture vulkan_create_texture(vk_t *vk,
       const void *initial, const VkComponentMapping *swizzle,
       enum vk_texture_type type);
 
+void vulkan_sync_texture_to_gpu(vk_t *vk, const struct vk_texture *tex);
+void vulkan_sync_texture_to_cpu(vk_t *vk, const struct vk_texture *tex);
+
 void vulkan_transition_texture(vk_t *vk, struct vk_texture *texture);
+
+void vulkan_transfer_image_ownership(VkCommandBuffer cmd,
+      VkImage image, VkImageLayout layout,
+      VkPipelineStageFlags src_stages,
+      VkPipelineStageFlags dst_stages,
+      uint32_t src_queue_family,
+      uint32_t dst_queue_family);
 
 void vulkan_map_persistent_texture(
       VkDevice device,

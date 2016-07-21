@@ -61,6 +61,7 @@ enum menu_entries_ctl_state
 typedef struct menu_file_list_cbs
 {
    rarch_setting_t *setting;
+   enum msg_hash_enums enum_idx;
 
    int (*action_iterate)(const char *label, unsigned action);
    const char *action_iterate_ident;
@@ -110,6 +111,12 @@ typedef struct menu_file_list_cbs
    int (*action_up)(unsigned type, const char *label);
    const char *action_up_ident;
 
+   int (*action_label)(file_list_t *list,
+         unsigned type, unsigned i,
+         const char *label, const char *path,
+         char *s, size_t len);
+   const char *action_label_ident;
+
    int (*action_down)(unsigned type, const char *label);
    const char *action_down_ident;
 
@@ -138,11 +145,11 @@ file_list_t *menu_entries_get_selection_buf_ptr(size_t idx);
 
 file_list_t *menu_entries_get_menu_stack_ptr(size_t idx);
 
-void menu_entries_add(file_list_t *list, const char *path, const char *label,
+void menu_entries_append(file_list_t *list, const char *path, const char *label,
       unsigned type, size_t directory_ptr, size_t entry_idx);
 
 void menu_entries_get_last_stack(const char **path, const char **label,
-      unsigned *file_type, size_t *entry_idx);
+      unsigned *file_type, enum msg_hash_enums *enum_idx, size_t *entry_idx);
 
 menu_file_list_cbs_t *menu_entries_get_last_stack_actiondata(void);
 
@@ -174,6 +181,11 @@ void menu_entries_set_alt_at_offset(file_list_t *list, size_t idx,
 rarch_setting_t *menu_entries_get_setting(uint32_t i);
 
 void menu_entries_prepend(file_list_t *list, const char *path, const char *label,
+      enum msg_hash_enums enum_idx,
+      unsigned type, size_t directory_ptr, size_t entry_idx);
+
+void menu_entries_append_enum(file_list_t *list, const char *path, const char *label,
+      enum msg_hash_enums enum_idx,
       unsigned type, size_t directory_ptr, size_t entry_idx);
 
 bool menu_entries_ctl(enum menu_entries_ctl_state state, void *data);

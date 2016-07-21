@@ -41,11 +41,8 @@
 #include <retro_inline.h>
 #include <file/file_path.h>
 
-#ifdef HAVE_MENU
-#include "../../menu/menu_hash.h"
-#endif
-
 #include "../ui_companion_driver.h"
+#include "../../msg_hash.h"
 #include "../../driver.h"
 #include "../../runloop.h"
 #include "../../gfx/video_context_driver.h"
@@ -557,22 +554,14 @@ LRESULT win32_menu_loop(HWND owner, WPARAM wparam)
             switch (mode)
             {
                case ID_M_LOAD_CORE:
-                  extensions  = "Libretro core (.dll)\0*.dll\0\All Files\0*.*\0";
-#ifdef HAVE_MENU
-                  title       = menu_hash_to_str(MENU_LABEL_VALUE_CORE_LIST);
-#else
-                  title       = "Load Core";
-#endif
+                  extensions  = "Libretro core (.dll)\0*.dll\0All Files\0*.*\0";
+                  title       = msg_hash_to_str(MENU_ENUM_LABEL_VALUE_CORE_LIST);
                   initial_dir = settings->directory.libretro;
                   break;
                case ID_M_LOAD_CONTENT:
-                  extensions  = "All Files\0*.*\0\0";
-#ifdef HAVE_MENU
-                  title       = menu_hash_to_str(
-                        MENU_LABEL_VALUE_LOAD_CONTENT_LIST);
-#else
-                  title       = "Load Content";
-#endif
+                  extensions  = "All Files\0*.*\0";
+                  title       = msg_hash_to_str(
+                        MENU_ENUM_LABEL_VALUE_LOAD_CONTENT_LIST);
                   initial_dir = settings->directory.menu_content;
                   break;
             }
@@ -738,6 +727,7 @@ const ui_companion_driver_t ui_companion_win32 = {
    ui_companion_win32_event_command,
    ui_companion_win32_notify_content_loaded,
    ui_companion_win32_notify_list_pushed,
+   NULL,
    NULL,
    NULL,
    NULL,

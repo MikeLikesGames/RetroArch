@@ -80,7 +80,12 @@ typedef struct frontend_ctx_driver
    enum frontend_architecture (*get_architecture)(void);
    enum frontend_powerstate (*get_powerstate)(int *seconds, int *percent);
    int  (*parse_drive_list)(void*);
-   uint32_t (*get_total_mem)(void);
+   uint64_t (*get_total_mem)(void);
+   uint64_t (*get_used_mem)(void);
+   void (*install_signal_handler)(void);
+   int (*get_signal_handler_state)(void);
+   void (*set_signal_handler_state)(int value);
+   void (*destroy_signal_handler_state)(void);
 
    const char *ident;
 
@@ -93,6 +98,7 @@ extern frontend_ctx_driver_t frontend_ctx_xdk;
 extern frontend_ctx_driver_t frontend_ctx_qnx;
 extern frontend_ctx_driver_t frontend_ctx_darwin;
 extern frontend_ctx_driver_t frontend_ctx_linux;
+extern frontend_ctx_driver_t frontend_ctx_bsd;
 extern frontend_ctx_driver_t frontend_ctx_psp;
 extern frontend_ctx_driver_t frontend_ctx_ctr;
 extern frontend_ctx_driver_t frontend_ctx_win32;
@@ -154,7 +160,17 @@ bool frontend_driver_get_core_extension(char *s, size_t len);
 
 bool frontend_driver_get_salamander_basename(char *s, size_t len);
 
-uint32_t frontend_driver_get_total_memory(void);
+uint64_t frontend_driver_get_total_memory(void);
+
+uint64_t frontend_driver_get_used_memory(void);
+
+void frontend_driver_install_signal_handler(void);
+
+int frontend_driver_get_signal_handler_state(void);
+
+void frontend_driver_set_signal_handler_state(int value);
+
+void frontend_driver_destroy_signal_handler_state(void);
 
 RETRO_END_DECLS
 

@@ -23,7 +23,8 @@
 #include "gl_common.h"
 #endif
 
-volatile sig_atomic_t g_egl_quit;
+#include "../../frontend/frontend_driver.h"
+
 bool g_egl_inited;
 
 unsigned g_egl_major = 0;
@@ -100,8 +101,9 @@ void egl_destroy(egl_ctx_data_t *egl)
    egl->surf    = EGL_NO_SURFACE;
    egl->dpy     = EGL_NO_DISPLAY;
    egl->config  = 0;
-   g_egl_quit    = 0;
    g_egl_inited  = false;
+
+   frontend_driver_destroy_signal_handler_state();
 }
 
 void egl_bind_hw_render(egl_ctx_data_t *egl, bool enable)
@@ -166,34 +168,12 @@ void egl_get_video_size(egl_ctx_data_t *egl, unsigned *width, unsigned *height)
    }
 }
 
-#ifndef HAVE_BB10
-static void egl_sighandler(int sig)
-{
-   (void)sig;
-   if (g_egl_quit) exit(1);
-   g_egl_quit = 1;
-}
-#endif
-
-void egl_install_sighandlers(void)
-{
-#ifndef HAVE_BB10
-   struct sigaction sa;
-
-   sa.sa_sigaction = NULL;
-   sa.sa_handler   = egl_sighandler;
-   sa.sa_flags     = SA_RESTART;
-   sigemptyset(&sa.sa_mask);
-   sigaction(SIGINT, &sa, NULL);
-   sigaction(SIGTERM, &sa, NULL);
-#endif
-}
-
 bool egl_init_context(egl_ctx_data_t *egl,
-      NativeDisplayType display,
+      void *display_data,
       EGLint *major, EGLint *minor,
      EGLint *n, const EGLint *attrib_ptr)
 {
+   NativeDisplayType display = (NativeDisplayType)display_data;
    egl->dpy = eglGetDisplay(display);
    if (!egl->dpy)
    {
@@ -237,9 +217,9 @@ bool egl_create_context(egl_ctx_data_t *egl, const EGLint *egl_attribs)
    return true;
 }
 
-bool egl_create_surface(egl_ctx_data_t *egl, NativeWindowType native_window)
+bool egl_create_surface(egl_ctx_data_t *egl, void *native_window)
 {
-   egl->surf = eglCreateWindowSurface(egl->dpy, egl->config, native_window, NULL);
+   egl->surf = eglCreateWindowSurface(egl->dpy, egl->config, (NativeWindowType)native_window, NULL);
 
    if (egl->surf == EGL_NO_SURFACE)
       return false;

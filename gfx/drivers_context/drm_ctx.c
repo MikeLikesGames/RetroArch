@@ -38,6 +38,7 @@
 #include "../../verbosity.h"
 #include "../../driver.h"
 #include "../../runloop.h"
+#include "../../frontend/frontend_driver.h"
 #include "../common/drm_common.h"
 
 #ifdef HAVE_EGL
@@ -59,8 +60,6 @@
 #endif
 
 #endif
-
-static volatile sig_atomic_t drm_quit = 0;
 
 static enum gfx_ctx_api drm_api;
 
@@ -89,25 +88,6 @@ struct drm_fb
    struct gbm_bo *bo;
    uint32_t fb_id;
 };
-
-static void drm_sighandler(int sig)
-{
-   (void)sig;
-   if (drm_quit) exit(1);
-   drm_quit = 1;
-}
-
-static void drm_install_sighandler(void)
-{
-   struct sigaction sa;
-
-   sa.sa_sigaction = NULL;
-   sa.sa_handler   = drm_sighandler;
-   sa.sa_flags     = SA_RESTART;
-   sigemptyset(&sa.sa_mask);
-   sigaction(SIGINT, &sa, NULL);
-   sigaction(SIGTERM, &sa, NULL);
-}
 
 static void drm_fb_destroy_callback(struct gbm_bo *bo, void *data)
 {
@@ -170,7 +150,7 @@ static void gfx_ctx_drm_check_window(void *data, bool *quit,
    (void)height;
 
    *resize = false;
-   *quit   = drm_quit;
+   *quit   = (bool)frontend_driver_get_signal_handler_state();
 }
 
 
@@ -245,6 +225,7 @@ static bool gfx_ctx_drm_queue_flip(void)
 static void gfx_ctx_drm_swap_buffers(void *data)
 {
    gfx_ctx_drm_data_t *drm = (gfx_ctx_drm_data_t*)data;
+   settings_t    *settings = config_get_ptr();
 
    switch (drm_api)
    {
@@ -269,12 +250,11 @@ static void gfx_ctx_drm_swap_buffers(void *data)
 
    waiting_for_flip = gfx_ctx_drm_queue_flip();
 
-   if (gbm_surface_has_free_buffers(g_gbm_surface))
+   /* Triple-buffered page flips */
+   if (settings->video.max_swapchain_images >= 3 &&
+         gbm_surface_has_free_buffers(g_gbm_surface))
       return;
 
-   /* We have to wait for this flip to finish. 
-    * This shouldn't happen as we have triple buffered page-flips. */
-   RARCH_WARN("[KMS]: Triple buffering is not working correctly ...\n");
    gfx_ctx_drm_wait_flip(true);  
 }
 
@@ -646,7 +626,7 @@ static bool gfx_ctx_drm_set_video_mode(void *data,
    if (!drm)
       return false;
 
-   drm_install_sighandler();
+   frontend_driver_install_signal_handler();
 
    /* If we use black frame insertion, 
     * we fake a 60 Hz monitor for 120 Hz one, 
@@ -876,12 +856,10 @@ static uint32_t gfx_ctx_drm_get_flags(void *data)
    uint32_t             flags = 0;
    gfx_ctx_drm_data_t    *drm = (gfx_ctx_drm_data_t*)data;
 
+   BIT32_SET(flags, GFX_CTX_FLAGS_CUSTOMIZABLE_SWAPCHAIN_IMAGES);
+
    if (drm->core_hw_context_enable)
-   {
       BIT32_SET(flags, GFX_CTX_FLAGS_GL_CORE_CONTEXT);
-   }
-   else
-      BIT32_SET(flags, GFX_CTX_FLAGS_NONE);
 
    return flags;
 }

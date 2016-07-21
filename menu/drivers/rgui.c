@@ -37,7 +37,6 @@
 #include "../menu_animation.h"
 #include "../menu_display.h"
 #include "../menu_navigation.h"
-#include "../menu_hash.h"
 
 #include "../../gfx/drivers_font_renderer/bitmap.h"
 
@@ -207,7 +206,7 @@ static void blit_line(int x, int y,
    if (!rgui_framebuf_data)
       return;
 
-   while (*message)
+   while (!string_is_empty(message))
    {
       const uint8_t *font_fb = menu_display_get_font_framebuffer();
       uint32_t symbol        = string_walk(&message);
@@ -545,7 +544,7 @@ static void rgui_render(void *data)
       blit_line(
             RGUI_TERM_START_X(fb_width),
             RGUI_TERM_START_X(fb_width),
-            menu_hash_to_str(MENU_VALUE_BACK),
+            msg_hash_to_str(MENU_ENUM_LABEL_VALUE_BACK),
             TITLE_COLOR(settings));
 
    strlcpy(title_buf, string_to_upper(title_buf), sizeof(title_buf));
@@ -609,7 +608,7 @@ static void rgui_render(void *data)
       type_str_buf[0]    = '\0';
 
       menu_entry_get_value(i, entry_value, sizeof(entry_value));
-      menu_entry_get_path(i, entry_path, sizeof(entry_path));
+      menu_entry_get_rich_label(i, entry_path, sizeof(entry_path));
 
       ticker.s        = entry_title_buf;
       ticker.len      = RGUI_TERM_WIDTH(fb_width) - (entry_spacing + 1 + 2);
@@ -851,20 +850,19 @@ static int rgui_pointer_tap(void *data,
       unsigned ptr, menu_file_list_cbs_t *cbs,
       menu_entry_t *entry, unsigned action)
 {
-   size_t selection, idx;
-   unsigned header_height;
-   bool scroll              = false;
-
-   menu_navigation_ctl(MENU_NAVIGATION_CTL_GET_SELECTION, &selection);
-   header_height = menu_display_get_header_height();
+   size_t selection;
+   unsigned header_height = menu_display_get_header_height();
 
    if (y < header_height)
    {
-      menu_entries_pop_stack(&selection, 0, 1);
-      menu_navigation_ctl(MENU_NAVIGATION_CTL_SET_SELECTION, &selection);
+      menu_navigation_ctl(MENU_NAVIGATION_CTL_GET_SELECTION, &selection);
+      return menu_entry_action(entry, selection, MENU_ACTION_CANCEL);
    }
    else if (ptr <= (menu_entries_get_size() - 1))
    {
+      size_t idx;
+      bool scroll              = false;
+      menu_navigation_ctl(MENU_NAVIGATION_CTL_GET_SELECTION, &selection);
       if (ptr == selection && cbs && cbs->action_select)
          return menu_entry_action(entry, selection, MENU_ACTION_SELECT);
 

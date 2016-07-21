@@ -21,27 +21,13 @@
 #include <boolean.h>
 
 #include "menu_entries.h"
-#include "menu_hash.h"
-
-#define CB_CORE_UPDATER_DOWNLOAD       0x7412da7dU
-#define CB_CORE_UPDATER_LIST           0x32fd4f01U
-#define CB_UPDATE_ASSETS               0xbf85795eU
-#define CB_UPDATE_CORE_INFO_FILES      0xe6084091U
-#define CB_UPDATE_AUTOCONFIG_PROFILES  0x28ada67dU
-#define CB_UPDATE_CHEATS               0xc360fec3U
-#define CB_UPDATE_OVERLAYS             0x699009a0U
-#define CB_UPDATE_DATABASES            0x931eb8d3U
-#define CB_UPDATE_SHADERS_GLSL         0x0121a186U
-#define CB_UPDATE_SHADERS_CG           0xc93a53feU
-#define CB_CORE_CONTENT_LIST           0xebc51227U
-#define CB_CORE_CONTENT_DOWNLOAD       0x03b3c0a3U
-#define CB_LAKKA_DOWNLOAD              0x54eaa904U
 
 enum
 {
    ACTION_OK_DL_DEFAULT = 0,
    ACTION_OK_DL_OPEN_ARCHIVE,
    ACTION_OK_DL_OPEN_ARCHIVE_DETECT_CORE,
+   ACTION_OK_DL_SCAN_DIR_LIST,
    ACTION_OK_DL_HELP,
    ACTION_OK_DL_RPL_ENTRY,
    ACTION_OK_DL_RDB_ENTRY,
@@ -52,8 +38,17 @@ enum
    ACTION_OK_DL_SHADER_PRESET,
    ACTION_OK_DL_GENERIC,
    ACTION_OK_DL_PUSH_DEFAULT,
-   ACTION_OK_DL_DOWNLOADS_DIR,
+   ACTION_OK_DL_FILE_BROWSER_SELECT_DIR,
    ACTION_OK_DL_INPUT_SETTINGS_LIST,
+   ACTION_OK_DL_DRIVER_SETTINGS_LIST,
+   ACTION_OK_DL_VIDEO_SETTINGS_LIST,
+   ACTION_OK_DL_AUDIO_SETTINGS_LIST,
+   ACTION_OK_DL_CONFIGURATION_SETTINGS_LIST,
+   ACTION_OK_DL_SAVING_SETTINGS_LIST,
+   ACTION_OK_DL_LOGGING_SETTINGS_LIST,
+   ACTION_OK_DL_FRAME_THROTTLE_SETTINGS_LIST,
+   ACTION_OK_DL_REWIND_SETTINGS_LIST,
+   ACTION_OK_DL_CORE_SETTINGS_LIST,
    ACTION_OK_DL_INPUT_HOTKEY_BINDS_LIST,
    ACTION_OK_DL_PLAYLIST_SETTINGS_LIST,
    ACTION_OK_DL_ACCOUNTS_LIST,
@@ -78,13 +73,29 @@ enum
    ACTION_OK_DL_CORE_UPDATER_LIST,
    ACTION_OK_DL_THUMBNAILS_UPDATER_LIST,
    ACTION_OK_DL_CORE_CONTENT_LIST,
+   ACTION_OK_DL_CORE_CONTENT_DIRS_LIST,
+   ACTION_OK_DL_CORE_CONTENT_DIRS_SUBDIR_LIST,
    ACTION_OK_DL_DEFERRED_CORE_LIST,
    ACTION_OK_DL_DEFERRED_CORE_LIST_SET,
+   ACTION_OK_DL_ONSCREEN_DISPLAY_SETTINGS_LIST,
+   ACTION_OK_DL_ONSCREEN_OVERLAY_SETTINGS_LIST,
+   ACTION_OK_DL_MENU_SETTINGS_LIST,
+   ACTION_OK_DL_USER_INTERFACE_SETTINGS_LIST,
+   ACTION_OK_DL_MENU_FILE_BROWSER_SETTINGS_LIST,
+   ACTION_OK_DL_RETRO_ACHIEVEMENTS_SETTINGS_LIST,
+   ACTION_OK_DL_UPDATER_SETTINGS_LIST,
+   ACTION_OK_DL_NETWORK_SETTINGS_LIST,
+   ACTION_OK_DL_USER_SETTINGS_LIST,
+   ACTION_OK_DL_DIRECTORY_SETTINGS_LIST,
+   ACTION_OK_DL_PRIVACY_SETTINGS_LIST,
    ACTION_OK_DL_CONTENT_SETTINGS
 };
 
 /* FIXME - Externs, refactor */
 extern size_t hack_shader_pass;
+extern char *core_buf;
+extern size_t core_len;
+extern unsigned rpl_entry_selection_ptr;
 
 /* Function callbacks */
 
@@ -95,7 +106,7 @@ int shader_action_parameter_right(unsigned type, const char *label, bool wraparo
 int shader_action_parameter_preset_right(unsigned type, const char *label,
       bool wraparound);
 
-int generic_action_ok_displaylist_push(const char *path,
+int generic_action_ok_displaylist_push(const char *path, const char *new_path,
       const char *label, unsigned type, size_t idx, size_t entry_idx,
       unsigned action_type);
 
@@ -124,81 +135,58 @@ int action_right_cheat(unsigned type, const char *label,
 
 int menu_cbs_init_bind_left(menu_file_list_cbs_t *cbs,
       const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1, const char *menu_label,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *menu_label,
+      uint32_t label_hash);
 
 int menu_cbs_init_bind_right(menu_file_list_cbs_t *cbs,
       const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1, const char *menu_label,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *menu_label,
+      uint32_t label_hash);
 
 int menu_cbs_init_bind_refresh(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_get_string_representation(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
+
+int menu_cbs_init_bind_label(menu_file_list_cbs_t *cbs,
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_up(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_down(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_info(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_start(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_content_list_switch(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_cancel(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_ok(menu_file_list_cbs_t *cbs,
       const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1, const char *menu_label,
       uint32_t label_hash, uint32_t menu_label_hash);
 
 int menu_cbs_init_bind_deferred_push(menu_file_list_cbs_t *cbs,
       const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      uint32_t label_hash);
 
 int menu_cbs_init_bind_select(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_scan(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
+      const char *path, const char *label, unsigned type, size_t idx);
 
 int menu_cbs_init_bind_title(menu_file_list_cbs_t *cbs,
       const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash);
-
-int deferred_push_content_list(void *data, void *userdata,
-      const char *path, const char *label, unsigned type);
+      uint32_t label_hash);
 
 #ifdef HAVE_LIBRETRODB
 int action_scan_directory(const char *path,
@@ -215,8 +203,6 @@ void menu_cbs_init(void *data,
       menu_file_list_cbs_t *cbs,
       const char *path, const char *label,
       unsigned type, size_t idx);
-
-bool menu_playlist_find_associated_core(const char *path, char *s, size_t len);
 
 int menu_cbs_exit(void);
 

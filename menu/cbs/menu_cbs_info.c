@@ -18,7 +18,6 @@
 #include "../menu_driver.h"
 #include "../menu_navigation.h"
 #include "../menu_cbs.h"
-#include "../menu_hash.h"
 
 #ifndef BIND_ACTION_INFO
 #define BIND_ACTION_INFO(cbs, name) \
@@ -37,8 +36,9 @@ static int action_info_default(unsigned type, const char *label)
 
    info.list          = menu_stack;
    info.directory_ptr = selection;
+   info.enum_idx      = MENU_ENUM_LABEL_INFO_SCREEN;
    strlcpy(info.label,
-         menu_hash_to_str(MENU_LABEL_INFO_SCREEN),
+         msg_hash_to_str(MENU_ENUM_LABEL_INFO_SCREEN),
         sizeof(info.label));
 
    if (!menu_displaylist_ctl(DISPLAYLIST_HELP, &info))
@@ -51,9 +51,7 @@ static int action_info_default(unsigned type, const char *label)
 }
 
 int menu_cbs_init_bind_info(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash)
+      const char *path, const char *label, unsigned type, size_t idx)
 {
    if (!cbs)
       return -1;

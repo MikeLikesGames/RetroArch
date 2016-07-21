@@ -164,10 +164,10 @@ static int menu_cbs_init_bind_select_compare_type(
    {
       switch (type)
       {
-         case MENU_FILE_DIRECTORY:
+         case FILE_TYPE_DIRECTORY:
             BIND_ACTION_SELECT(cbs, action_select_directory);
             break;
-         case MENU_FILE_USE_DIRECTORY:
+         case FILE_TYPE_USE_DIRECTORY:
             BIND_ACTION_SELECT(cbs, action_select_path_use_directory);
             break;
          default:
@@ -179,15 +179,13 @@ static int menu_cbs_init_bind_select_compare_type(
 }
 
 static int menu_cbs_init_bind_select_compare_label(menu_file_list_cbs_t *cbs,
-      const char *label, uint32_t hash, const char *elem0)
+      const char *label)
 {
    return -1;
 }
 
 int menu_cbs_init_bind_select(menu_file_list_cbs_t *cbs,
-      const char *path, const char *label, unsigned type, size_t idx,
-      const char *elem0, const char *elem1,
-      uint32_t label_hash, uint32_t menu_label_hash)
+      const char *path, const char *label, unsigned type, size_t idx)
 {
    if (!cbs)
       return -1;
@@ -211,7 +209,7 @@ int menu_cbs_init_bind_select(menu_file_list_cbs_t *cbs,
       return 0;
    }
 
-   if (menu_cbs_init_bind_select_compare_label(cbs, label, label_hash, elem0) == 0)
+   if (menu_cbs_init_bind_select_compare_label(cbs, label) == 0)
       return 0;
 
    if (menu_cbs_init_bind_select_compare_type(cbs, type) == 0)

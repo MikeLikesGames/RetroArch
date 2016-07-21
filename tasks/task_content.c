@@ -296,7 +296,9 @@ static int content_7zip_file_read(
       {
          /* Error handling */
          if (!file_found)
-            RARCH_ERR("File %s not found in %s\n", needle, path);
+            RARCH_ERR("%s: %s in %s.\n", 
+                  msg_hash_to_str(MSG_FILE_NOT_FOUND),
+                  needle, path);
 
          RARCH_ERR("Failed to open compressed file inside 7zip archive.\n");
 
@@ -330,7 +332,7 @@ static struct string_list *compressed_7zip_file_list_new(
 
    if (InFile_Open(&archiveStream.file, path))
    {
-      RARCH_ERR("Could not open %s as 7z archive.\n",path);
+      RARCH_ERR("Could not open as 7zip archive: %s.\n",path);
       return NULL;
    }
 
@@ -470,7 +472,8 @@ static bool content_zip_file_decompressed_handle(
 
    if (handle->real_checksum != crc32)
    {
-      RARCH_ERR("Inflated checksum did not match CRC32!\n");
+      RARCH_ERR("%s\n",
+            msg_hash_to_str(MSG_INFLATED_CHECKSUM_DID_NOT_MATCH_CRC32));
       goto error;
    }
 
@@ -526,7 +529,9 @@ static int content_zip_file_decompressed(
 
             if (buf)
             {
-               RARCH_LOG("Extracting file : %s\n", st->opt_file);
+               RARCH_LOG("%s: %s\n", 
+                     msg_hash_to_str(MSG_EXTRACTING_FILE),
+                     st->opt_file);
                memcpy(buf, handle.data, size);
 
                if (!filestream_write_file(st->opt_file, buf, size))
@@ -661,9 +666,9 @@ static int content_file_compressed_read(
       if (*length != -1)
          ret = 1;
    }
+#endif
 
    string_list_free(str_list);
-#endif
    return ret;
 
 error:
@@ -735,55 +740,56 @@ static void check_default_dirs(void)
     */
    if (path_file_exists("custom.ini"))
       return;
-   if (*g_defaults.dir.core_assets)
+
+   if (!string_is_empty(g_defaults.dir.core_assets))
       check_defaults_dir_create_dir(g_defaults.dir.core_assets);
-   if (*g_defaults.dir.remap)
+   if (!string_is_empty(g_defaults.dir.remap))
       check_defaults_dir_create_dir(g_defaults.dir.remap);
-   if (*g_defaults.dir.screenshot)
+   if (!string_is_empty(g_defaults.dir.screenshot))
       check_defaults_dir_create_dir(g_defaults.dir.screenshot);
-   if (*g_defaults.dir.core)
+   if (!string_is_empty(g_defaults.dir.core))
       check_defaults_dir_create_dir(g_defaults.dir.core);
-   if (*g_defaults.dir.autoconfig)
+   if (!string_is_empty(g_defaults.dir.autoconfig))
       check_defaults_dir_create_dir(g_defaults.dir.autoconfig);
-   if (*g_defaults.dir.audio_filter)
+   if (!string_is_empty(g_defaults.dir.audio_filter))
       check_defaults_dir_create_dir(g_defaults.dir.audio_filter);
-   if (*g_defaults.dir.video_filter)
+   if (!string_is_empty(g_defaults.dir.video_filter))
       check_defaults_dir_create_dir(g_defaults.dir.video_filter);
-   if (*g_defaults.dir.assets)
+   if (!string_is_empty(g_defaults.dir.assets))
       check_defaults_dir_create_dir(g_defaults.dir.assets);
-   if (*g_defaults.dir.playlist)
+   if (!string_is_empty(g_defaults.dir.playlist))
       check_defaults_dir_create_dir(g_defaults.dir.playlist);
-   if (*g_defaults.dir.core)
+   if (!string_is_empty(g_defaults.dir.core))
       check_defaults_dir_create_dir(g_defaults.dir.core);
-   if (*g_defaults.dir.core_info)
+   if (!string_is_empty(g_defaults.dir.core_info))
       check_defaults_dir_create_dir(g_defaults.dir.core_info);
-   if (*g_defaults.dir.overlay)
+   if (!string_is_empty(g_defaults.dir.overlay))
       check_defaults_dir_create_dir(g_defaults.dir.overlay);
-   if (*g_defaults.dir.port)
+   if (!string_is_empty(g_defaults.dir.port))
       check_defaults_dir_create_dir(g_defaults.dir.port);
-   if (*g_defaults.dir.shader)
+   if (!string_is_empty(g_defaults.dir.shader))
       check_defaults_dir_create_dir(g_defaults.dir.shader);
-   if (*g_defaults.dir.savestate)
+   if (!string_is_empty(g_defaults.dir.savestate))
       check_defaults_dir_create_dir(g_defaults.dir.savestate);
-   if (*g_defaults.dir.sram)
+   if (!string_is_empty(g_defaults.dir.sram))
       check_defaults_dir_create_dir(g_defaults.dir.sram);
-   if (*g_defaults.dir.system)
+   if (!string_is_empty(g_defaults.dir.system))
       check_defaults_dir_create_dir(g_defaults.dir.system);
-   if (*g_defaults.dir.resampler)
+   if (!string_is_empty(g_defaults.dir.resampler))
       check_defaults_dir_create_dir(g_defaults.dir.resampler);
-   if (*g_defaults.dir.menu_config)
+   if (!string_is_empty(g_defaults.dir.menu_config))
       check_defaults_dir_create_dir(g_defaults.dir.menu_config);
-   if (*g_defaults.dir.content_history)
+   if (!string_is_empty(g_defaults.dir.content_history))
       check_defaults_dir_create_dir(g_defaults.dir.content_history);
-   if (*g_defaults.dir.cache)
+   if (!string_is_empty(g_defaults.dir.cache))
       check_defaults_dir_create_dir(g_defaults.dir.cache);
-   if (*g_defaults.dir.database)
+   if (!string_is_empty(g_defaults.dir.database))
       check_defaults_dir_create_dir(g_defaults.dir.database);
-   if (*g_defaults.dir.cursor)
+   if (!string_is_empty(g_defaults.dir.cursor))
       check_defaults_dir_create_dir(g_defaults.dir.cursor);
-   if (*g_defaults.dir.cheats)
+   if (!string_is_empty(g_defaults.dir.cheats))
       check_defaults_dir_create_dir(g_defaults.dir.cheats);
-   if (*g_defaults.dir.thumbnails)
+   if (!string_is_empty(g_defaults.dir.thumbnails))
       check_defaults_dir_create_dir(g_defaults.dir.thumbnails);
 }
 
@@ -840,7 +846,8 @@ static void content_load_init_wrap(
 #ifdef HAVE_MENU
       else
       {
-         RARCH_LOG("No content, starting dummy core.\n");
+         RARCH_LOG("%s\n",
+               msg_hash_to_str(MSG_NO_CONTENT_STARTING_DUMMY_CORE));
          argv[(*argc)++] = strdup("--menu");
       }
 #endif
@@ -1126,8 +1133,6 @@ static bool load_content_from_compressed_archive(
       return false;
    }
 
-   RARCH_LOG("New path is: [%s]\n", new_path);
-
    string_list_append(additional_path_allocs, new_path, attributes);
    info[i].path = 
       additional_path_allocs->elems[additional_path_allocs->size -1 ].data;
@@ -1171,14 +1176,14 @@ static bool load_content(
 
       if (require_content && string_is_empty(path))
       {
-         RARCH_LOG("libretro core requires content, "
-               "but nothing was provided.\n");
+         RARCH_LOG("%s\n",
+               msg_hash_to_str(MSG_ERROR_LIBRETRO_CORE_REQUIRES_CONTENT));
          return false;
       }
 
       info[i].path = NULL;
 
-      if (*path)
+      if (!string_is_empty(path))
          info[i].path = path;
 
       if (!need_fullpath && !string_is_empty(path))
@@ -1188,8 +1193,9 @@ static bool load_content(
       }
       else
       {
-         RARCH_LOG("Content loading skipped. Implementation will"
-               " load it on its own.\n");
+         RARCH_LOG("%s\n",
+               msg_hash_to_str(
+                  MSG_CONTENT_LOADING_SKIPPED_IMPLEMENTATION_WILL_DO_IT));
 
 #ifdef HAVE_COMPRESSION
          if (!load_content_from_compressed_archive(
@@ -1218,7 +1224,7 @@ static bool load_content(
 
       cheevos_set_cheats();
 
-      if (*content->elems[0].data)
+      if (!string_is_empty(content->elems[0].data))
          load_data = info;
       cheevos_load(load_data);
    }
@@ -1245,14 +1251,14 @@ static const struct retro_subsystem_info *init_content_file_subsystem(
 
    if (special->num_roms && !global->subsystem_fullpaths)
    {
-      RARCH_ERR("libretro core requires special content, "
-            "but none were provided.\n");
+      RARCH_ERR("%s\n",
+            msg_hash_to_str(MSG_ERROR_LIBRETRO_CORE_REQUIRES_SPECIAL_CONTENT));
       goto error;
    }
    else if (special->num_roms && special->num_roms
          != global->subsystem_fullpaths->size)
    {
-      RARCH_ERR("libretro core requires %u content files for "
+      RARCH_ERR("Libretro core requires %u content files for "
             "subsystem \"%s\", but %u content files were provided.\n",
             special->num_roms, special->desc,
             (unsigned)global->subsystem_fullpaths->size);
@@ -1261,7 +1267,7 @@ static const struct retro_subsystem_info *init_content_file_subsystem(
    else if (!special->num_roms && global->subsystem_fullpaths
          && global->subsystem_fullpaths->size)
    {
-      RARCH_ERR("libretro core takes no content for subsystem \"%s\", "
+      RARCH_ERR("Libretro core takes no content for subsystem \"%s\", "
             "but %u content files were provided.\n",
             special->desc,
             (unsigned)global->subsystem_fullpaths->size);
@@ -1319,8 +1325,13 @@ static bool init_content_file_extract(
                   settings->directory.cache : NULL,
                   new_path, sizeof(new_path)))
          {
-            RARCH_ERR("Failed to extract content from zipped file: %s.\n",
+            RARCH_ERR("%s: %s.\n",
+                  msg_hash_to_str(
+                     MSG_FAILED_TO_EXTRACT_CONTENT_FROM_COMPRESSED_FILE),
                   temp_content);
+            runloop_msg_queue_push(
+                  msg_hash_to_str(MSG_FAILED_TO_EXTRACT_CONTENT_FROM_COMPRESSED_FILE)
+                  , 2, 180, true);
             return false;
          }
 
@@ -1346,7 +1357,7 @@ static bool init_content_file_set_attribs(
 
    attr.i                  = 0;
 
-   if (*global->subsystem && special)
+   if (!string_is_empty(global->subsystem) && special)
    {
       unsigned i;
 
@@ -1410,7 +1421,7 @@ static bool content_file_init(struct string_list *temporary_content)
 
    runloop_ctl(RUNLOOP_CTL_SYSTEM_INFO_GET, &system);
 
-   if (*global->subsystem && system)
+   if (!string_is_empty(global->subsystem))
    {
       special = init_content_file_subsystem(&ret, system);
       if (!ret)
@@ -1552,11 +1563,11 @@ static void menu_content_environment_get(int *argc, char *argv[],
    wrap_args->state_path       = NULL;
    wrap_args->content_path     = NULL;
 
-   if (*global->path.config)
+   if (!string_is_empty(global->path.config))
       wrap_args->config_path   = global->path.config;
-   if (*global->dir.savefile)
+   if (!string_is_empty(global->dir.savefile))
       wrap_args->sram_path     = global->dir.savefile;
-   if (*global->dir.savestate)
+   if (!string_is_empty(global->dir.savestate))
       wrap_args->state_path    = global->dir.savestate;
    if (fullpath && *fullpath)
       wrap_args->content_path  = fullpath;
@@ -1591,7 +1602,8 @@ static bool task_load_content(content_ctx_info_t *content_info,
       menu_display_set_msg_force(true);
       menu_driver_ctl(RARCH_MENU_CTL_RENDER, NULL);
 
-      fill_pathname_base(name, fullpath, sizeof(name));
+      if (!string_is_empty(fullpath))
+         fill_pathname_base(name, fullpath, sizeof(name));
    }
 #endif
 
@@ -1601,10 +1613,12 @@ static bool task_load_content(content_ctx_info_t *content_info,
    if (launched_from_menu)
    {
       /** Show loading OSD message */
-      if (*fullpath)
+      if (!string_is_empty(fullpath))
       {
-         snprintf(msg, sizeof(msg), "INFO - Loading %s ...", name);
-         runloop_msg_queue_push(msg, 1, 1, false);
+         snprintf(msg, sizeof(msg), "%s %s ...", 
+               msg_hash_to_str(MSG_LOADING),
+               name);
+         runloop_msg_queue_push(msg, 2, 1, true);
       }
    }
    
@@ -1630,7 +1644,7 @@ static bool task_load_content(content_ctx_info_t *content_info,
       {
          /* Path can be relative here.
           * Ensure we're pushing absolute path. */
-         if (*tmp)
+         if (!string_is_empty(tmp))
             path_resolve_realpath(tmp, sizeof(tmp));
       }
 
@@ -1649,8 +1663,10 @@ error:
    {
       if (!string_is_empty(fullpath) && !string_is_empty(name))
       {
-         snprintf(msg, sizeof(msg), "Failed to load %s.\n", name);
-         runloop_msg_queue_push(msg, 1, 90, false);
+         snprintf(msg, sizeof(msg), "%s %s.\n",
+               msg_hash_to_str(MSG_FAILED_TO_LOAD),
+               name);
+         runloop_msg_queue_push(msg, 2, 90, true);
       }
    }
    return false;
@@ -1710,9 +1726,13 @@ bool task_push_content_load_default(
 {
    bool loading_from_menu = false;
 
+   if (!content_info)
+      return false;
+
    /* First we determine if we are loading from a menu */
    switch (mode)
    {
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NEW_CORE_FROM_MENU:
 #if defined(HAVE_NETPLAY) && defined(HAVE_NETWORKGAMEPAD)
       case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
 #endif
@@ -1744,7 +1764,7 @@ bool task_push_content_load_default(
       case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI:
       case CONTENT_MODE_LOAD_NOTHING_WITH_DUMMY_CORE:
 #ifdef HAVE_MENU
-         if (content_info && !content_info->environ_get)
+         if (!content_info->environ_get)
             content_info->environ_get = menu_content_environment_get;
 #endif
          break;
@@ -1782,6 +1802,7 @@ bool task_push_content_load_default(
    /* Set libretro core path */
    switch (mode)
    {
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NEW_CORE_FROM_MENU:
       case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
       case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI:
       case CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU:
@@ -1822,16 +1843,30 @@ bool task_push_content_load_default(
    /* Load core */
    switch (mode)
    {
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NEW_CORE_FROM_MENU:
+#ifdef HAVE_DYNAMIC
       case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_MENU:
       case CONTENT_MODE_LOAD_CONTENT_WITH_NEW_CORE_FROM_COMPANION_UI:
       case CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU:
-#ifdef HAVE_DYNAMIC
-         command_event(CMD_EVENT_LOAD_CORE, NULL);
 #endif
+         command_event(CMD_EVENT_LOAD_CORE, NULL);
          break;
       default:
          break;
    }
+
+#ifndef HAVE_DYNAMIC
+   /* Fork core? */
+   switch (mode)
+   {
+	  case CONTENT_MODE_LOAD_NOTHING_WITH_NEW_CORE_FROM_MENU:
+         if (!frontend_driver_set_fork(FRONTEND_FORK_CORE))
+            return false;
+         break;
+      default:
+         break;
+   }
+#endif
 
    /* Preliminary stuff that has to be done before we 
     * load the actual content. Can differ per mode. */
@@ -1844,6 +1879,9 @@ bool task_push_content_load_default(
 #endif
          runloop_ctl(RUNLOOP_CTL_DATA_DEINIT, NULL);
          runloop_ctl(RUNLOOP_CTL_TASK_INIT, NULL);
+         break;
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NEW_CORE_FROM_MENU:
+         retroarch_set_current_core_type(type, true);
          break;
 #if defined(HAVE_NETPLAY) && defined(HAVE_NETWORKGAMEPAD)
       case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
@@ -1894,17 +1932,12 @@ bool task_push_content_load_default(
    switch (mode)
    {
       case CONTENT_MODE_LOAD_CONTENT_FROM_PLAYLIST_FROM_MENU:
-#if defined(HAVE_NETPLAY) && defined(HAVE_NETWORKGAMEPAD)
-      case CONTENT_MODE_LOAD_NOTHING_WITH_NET_RETROPAD_CORE_FROM_MENU:
-#endif
+      case CONTENT_MODE_LOAD_NOTHING_WITH_NEW_CORE_FROM_MENU:
          break;
       default:
 #ifdef HAVE_MENU
          if (type != CORE_TYPE_DUMMY && mode != CONTENT_MODE_LOAD_FROM_CLI)
-         {
-            menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUIT,       NULL);
             menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_QUICK_MENU, NULL);
-         }
 #endif
          break;
    }

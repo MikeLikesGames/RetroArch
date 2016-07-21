@@ -24,10 +24,11 @@
 #include "menu_cbs.h"
 #include "menu_display.h"
 #include "menu_navigation.h"
-#include "menu_hash.h"
 #include "menu_shader.h"
 
+#include "../config.def.h"
 #include "../content.h"
+#include "../configuration.h"
 #include "../dynamic.h"
 #include "../core_info.h"
 #include "../retroarch.h"
@@ -37,6 +38,7 @@
 #include "../list_special.h"
 #include "../tasks/tasks_internal.h"
 #include "../ui/ui_companion_driver.h"
+#include "../runloop.h"
 #include "../verbosity.h"
 
 static const menu_ctx_driver_t *menu_ctx_drivers[] = {
@@ -62,6 +64,19 @@ static const menu_ctx_driver_t *menu_ctx_drivers[] = {
    NULL
 };
 
+static struct retro_system_info menu_driver_system;
+static bool menu_driver_pending_quick_menu      = false;
+static bool menu_driver_prevent_populate        = false;
+static bool menu_driver_load_no_content         = false;
+static bool menu_driver_alive                   = false;
+static bool menu_driver_data_own                = false;
+static bool menu_driver_pending_quit            = false;
+static bool menu_driver_pending_shutdown        = false;
+static playlist_t *menu_driver_playlist         = NULL;
+static struct video_shader *menu_driver_shader  = NULL;
+static menu_handle_t *menu_driver_data          = NULL;
+static const menu_ctx_driver_t *menu_driver_ctx = NULL;
+static void *menu_userdata                      = NULL;
 
 /**
  * menu_driver_find_handle:
@@ -191,8 +206,6 @@ static bool menu_init(menu_handle_t *menu_data)
    return true;
 }
 
-static menu_ctx_iterate_t pending_iter;
-
 static void menu_input_key_event(bool down, unsigned keycode,
       uint32_t character, uint16_t mod)
 {
@@ -202,25 +215,6 @@ static void menu_input_key_event(bool down, unsigned keycode,
 
    if (character == '/')
       menu_entry_action(NULL, 0, MENU_ACTION_SEARCH);
-
-   if (down)
-   {
-      switch (keycode)
-      {
-         case RETROK_RETURN:
-            pending_iter.action = MENU_ACTION_OK;
-            menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_ACTION, NULL);
-            break;
-         case RETROK_BACKSPACE:
-            pending_iter.action = MENU_ACTION_CANCEL;
-            menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_ACTION, NULL);
-            break;
-         case RETROK_SPACE:
-            pending_iter.action = MENU_ACTION_START;
-            menu_driver_ctl(RARCH_MENU_CTL_SET_PENDING_ACTION, NULL);
-            break;
-      }
-   }
 }
 
 static void menu_driver_toggle(bool latch)
@@ -271,46 +265,28 @@ static void menu_driver_toggle(bool latch)
       if (settings && settings->menu.pause_libretro)
          command_event(CMD_EVENT_AUDIO_START, NULL);
 
-      /* Prevent stray input from going to libretro core */
-      input_driver_set_flushing_input();
-
       /* Restore libretro keyboard callback. */
       if (key_event && frontend_key_event)
          *key_event = *frontend_key_event;
    }
+
+   /* Prevent stray input */
+   input_driver_set_flushing_input();
+}
+
+const char *menu_driver_ident(void)
+{
+   if (!menu_driver_alive)
+      return NULL;
+   if (!menu_driver_ctx || !menu_driver_ctx->ident)
+      return NULL;
+  return menu_driver_ctx->ident;
 }
 
 bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
 {
-   static struct retro_system_info menu_driver_system;
-   static bool menu_driver_pending_quick_menu      = false;
-   static bool menu_driver_pending_action          = false;
-   static bool menu_driver_prevent_populate        = false;
-   static bool menu_driver_load_no_content         = false;
-   static bool menu_driver_alive                   = false;
-   static bool menu_driver_data_own                = false;
-   static bool menu_driver_pending_quit            = false;
-   static bool menu_driver_pending_shutdown        = false;
-   static playlist_t *menu_driver_playlist = NULL;
-   static struct video_shader *menu_driver_shader  = NULL;
-   static menu_handle_t *menu_driver_data          = NULL;
-   static const menu_ctx_driver_t *menu_driver_ctx = NULL;
-   static void *menu_userdata                      = NULL;
-   settings_t *settings                            = config_get_ptr();
-
    switch (state)
    {
-      case RARCH_MENU_CTL_IS_PENDING_ACTION:
-         if (!menu_driver_pending_action)
-            return false;
-         menu_driver_ctl(RARCH_MENU_CTL_UNSET_PENDING_ACTION, NULL);
-         break;
-      case RARCH_MENU_CTL_SET_PENDING_ACTION:
-         menu_driver_pending_action = true;
-         break;
-      case RARCH_MENU_CTL_UNSET_PENDING_ACTION:
-         menu_driver_pending_action = false;
-         break;
       case RARCH_MENU_CTL_DRIVER_DATA_GET:
          {
             menu_handle_t **driver_data = (menu_handle_t**)data;
@@ -345,7 +321,6 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
          break;
       case RARCH_MENU_CTL_DESTROY:
          menu_driver_pending_quick_menu = false;
-         menu_driver_pending_action     = false;
          menu_driver_pending_quit       = false;
          menu_driver_pending_shutdown   = false;
          menu_driver_prevent_populate   = false;
@@ -424,8 +399,13 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
          }
          break;
       case RARCH_MENU_CTL_SYSTEM_INFO_DEINIT:
-         libretro_free_system_info(&menu_driver_system);
-         memset(&menu_driver_system, 0, sizeof(struct retro_system_info));
+#ifndef HAVE_DYNAMIC
+         if (frontend_driver_has_fork())
+#endif
+         {
+            libretro_free_system_info(&menu_driver_system);
+            memset(&menu_driver_system, 0, sizeof(struct retro_system_info));
+         }
          break;
       case RARCH_MENU_CTL_RENDER_MESSAGEBOX:
          if (menu_driver_ctx->render_messagebox)
@@ -573,27 +553,30 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
          menu_driver_data = NULL;
          break;
       case RARCH_MENU_CTL_INIT:
-         if (menu_driver_data)
-            return true;
-
-         menu_driver_data = (menu_handle_t*)
-            menu_driver_ctx->init(&menu_userdata);
-
-         if (!menu_driver_data || !menu_init(menu_driver_data))
          {
-            retroarch_fail(1, "init_menu()");
-            return false;
-         }
+            settings_t *settings  = config_get_ptr();
+            if (menu_driver_data)
+               return true;
 
-         strlcpy(settings->menu.driver, menu_driver_ctx->ident,
-               sizeof(settings->menu.driver));
+            menu_driver_data = (menu_handle_t*)
+               menu_driver_ctx->init(&menu_userdata);
 
-         if (menu_driver_ctx->lists_init)
-         {
-            if (!menu_driver_ctx->lists_init(menu_driver_data))
+            if (!menu_driver_data || !menu_init(menu_driver_data))
             {
                retroarch_fail(1, "init_menu()");
                return false;
+            }
+
+            strlcpy(settings->menu.driver, menu_driver_ctx->ident,
+                  sizeof(settings->menu.driver));
+
+            if (menu_driver_ctx->lists_init)
+            {
+               if (!menu_driver_ctx->lists_init(menu_driver_data))
+               {
+                  retroarch_fail(1, "init_menu()");
+                  return false;
+               }
             }
          }
          break;
@@ -830,7 +813,6 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
          }
       case RARCH_MENU_CTL_ITERATE:
          {
-            bool retcode = false;
             menu_ctx_iterate_t *iterate = (menu_ctx_iterate_t*)data;
 
             if (menu_driver_ctl(RARCH_MENU_CTL_IS_PENDING_QUICK_MENU, NULL))
@@ -839,7 +821,7 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
                menu_entries_flush_stack(NULL, MENU_SETTINGS);
                menu_display_set_msg_force(true);
 
-               generic_action_ok_displaylist_push("",
+               generic_action_ok_displaylist_push("", NULL,
                      "", 0, 0, 0, ACTION_OK_DL_CONTENT_SETTINGS);
 
                if (menu_driver_ctl(RARCH_MENU_CTL_IS_PENDING_QUIT, NULL))
@@ -866,11 +848,6 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
             if (!menu_driver_ctx || !menu_driver_ctx->iterate)
                return false;
              
-            if (menu_driver_ctl(RARCH_MENU_CTL_IS_PENDING_ACTION, &retcode))
-            {
-                iterate->action = pending_iter.action;
-                pending_iter.action = MENU_ACTION_NOOP;
-            }
             if (menu_driver_ctx->iterate(menu_driver_data,
                      menu_userdata, iterate->action) == -1)
                return false;
@@ -916,11 +893,7 @@ bool menu_driver_ctl(enum rarch_menu_ctl_state state, void *data)
                   bind->path,
                   bind->label,
                   bind->type,
-                  bind->idx,
-                  bind->elem0,
-                  bind->elem1,
-                  bind->label_hash,
-                  bind->menu_label_hash);
+                  bind->idx);
          }
          break;
       case RARCH_MENU_CTL_UPDATE_THUMBNAIL_PATH:

@@ -60,7 +60,7 @@ void fill_pathname_expand_special(char *out_path,
          retro_assert(src_size < size);
 
          out_path  += src_size;
-         size -= src_size;
+         size      -= src_size;
          in_path++;
       }
    }
@@ -121,7 +121,7 @@ void fill_pathname_abbreviate_special(char *out_path,
    
    for (i = 0; candidates[i]; i++)
    {
-      if (*candidates[i] && strstr(in_path, candidates[i]) == in_path)
+      if (!string_is_empty(candidates[i]) && strstr(in_path, candidates[i]) == in_path)
       {
          size_t src_size  = strlcpy(out_path, notations[i], size);
 
@@ -346,7 +346,9 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
                char s1[PATH_MAX_LENGTH] = {0};
                fill_pathname_application_special(s1, sizeof(s1),
                      APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB_ICONS);
-               fill_pathname_join(s, s1, "bg.png", len);
+               fill_pathname_join(s, s1,
+                     file_path_str(FILE_PATH_BACKGROUND_IMAGE),
+                     len);
             }
          }
 #endif
@@ -408,14 +410,16 @@ void fill_pathname_application_special(char *s, size_t len, enum application_spe
          {
             settings_t *settings = config_get_ptr();
 
-            if (!string_is_empty(settings->menu.xmb_font))
-               strlcpy(s, settings->menu.xmb_font, len);
+            if (!string_is_empty(settings->menu.xmb.font))
+               strlcpy(s, settings->menu.xmb.font, len);
             else
             {
                char s1[PATH_MAX_LENGTH] = {0};
                fill_pathname_application_special(s1, sizeof(s1),
                      APPLICATION_SPECIAL_DIRECTORY_ASSETS_XMB);
-               fill_pathname_join(s, s1, "font.ttf", len);
+               fill_pathname_join(s, s1,
+                     file_path_str(FILE_PATH_TTF_FONT),
+                     len);
             }
          }
 #endif

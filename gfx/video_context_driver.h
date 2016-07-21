@@ -54,7 +54,8 @@ enum display_metric_types
 enum display_flags
 {
    GFX_CTX_FLAGS_NONE = 0,
-   GFX_CTX_FLAGS_GL_CORE_CONTEXT
+   GFX_CTX_FLAGS_GL_CORE_CONTEXT,
+   GFX_CTX_FLAGS_CUSTOMIZABLE_SWAPCHAIN_IMAGES
 };
 
 typedef void (*gfx_ctx_proc_t)(void);
@@ -242,6 +243,7 @@ extern const gfx_ctx_driver_t gfx_ctx_cgl;
 extern const gfx_ctx_driver_t gfx_ctx_cocoagl;
 extern const gfx_ctx_driver_t gfx_ctx_emscripten;
 extern const gfx_ctx_driver_t gfx_ctx_opendingux_fbdev;
+extern const gfx_ctx_driver_t gfx_ctx_khr_display;
 extern const gfx_ctx_driver_t gfx_ctx_null;
 
 /**

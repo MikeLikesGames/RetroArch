@@ -51,10 +51,10 @@ struct magic_entry
 };
 
 static struct magic_entry MAGIC_NUMBERS[] = {
-    {"ps1", "\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x02\x00\x02\x00"},
-    {"pcecd", "\x82\xb1\x82\xcc\x83\x76\x83\x8d\x83\x4f\x83\x89\x83\x80\x82\xcc\x92"},
-    {"scd", "\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x02\x00\x01\x53"},
-    {NULL, NULL}
+    {"ps1",    "\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x02\x00\x02\x00"},
+    {"pcecd",  "\x82\xb1\x82\xcc\x83\x76\x83\x8d\x83\x4f\x83\x89\x83\x80\x82\xcc\x92"},
+    {"scd",    "\x00\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\x00\x00\x02\x00\x01\x53"},
+    {NULL,     NULL}
 };
 
 static ssize_t get_token(RFILE *fd, char *token, size_t max_len)
@@ -147,7 +147,8 @@ static int detect_ps1_game_sub(const char *track_path,
    uint8_t* boot_file;
    int skip, frame_size, is_mode1, cd_sector;
    uint8_t buffer[2048 * 2] = {0};
-   RFILE                *fp = filestream_open(track_path, RFILE_MODE_READ, -1);
+   RFILE                *fp = 
+      filestream_open(track_path, RFILE_MODE_READ, -1);
    if (!fp)
       return 0;
 
@@ -256,7 +257,9 @@ int detect_psp_game(const char *track_path, char *game_id)
 
    if (!fd)
    {
-      RARCH_LOG("Could not open data track: %s\n", strerror(errno));
+      RARCH_LOG("%s: %s\n",
+            msg_hash_to_str(MSG_COULD_NOT_OPEN_DATA_TRACK),
+            strerror(errno));
       return -errno;
    }
 
@@ -341,7 +344,7 @@ int detect_system(const char *track_path, int32_t offset,
       goto clean;
    }
 
-   RARCH_LOG("Comparing with known magic numbers...\n");
+   RARCH_LOG("%s\n", msg_hash_to_str(MSG_COMPARING_WITH_KNOWN_MAGIC_NUMBERS));
    for (i = 0; MAGIC_NUMBERS[i].system_name != NULL; i++)
    {
       if (memcmp(MAGIC_NUMBERS[i].magic, magic, MAGIC_LEN) == 0)
@@ -364,7 +367,7 @@ int detect_system(const char *track_path, int32_t offset,
       }
    }
 
-   RARCH_LOG("Could not find compatible system\n");
+   RARCH_LOG("%s\n", msg_hash_to_str(MSG_COULD_NOT_FIND_COMPATIBLE_SYSTEM));
    rv = -EINVAL;
 
 clean:
@@ -375,15 +378,11 @@ clean:
 int find_first_data_track(const char *cue_path,
       int32_t *offset, char *track_path, size_t max_len)
 {
-   int rv, m, s, f;
-   char tmp_token[MAX_TOKEN_LEN];
-   char cue_dir[PATH_MAX_LENGTH];
-   RFILE *fd;
+   int rv;
+   char tmp_token[MAX_TOKEN_LEN] = {0};
+   RFILE *fd                     = 
+      filestream_open(cue_path, RFILE_MODE_READ, -1);
 
-   strlcpy(cue_dir, cue_path, sizeof(cue_dir));
-   path_basedir(cue_dir);
-
-   fd = filestream_open(cue_path, RFILE_MODE_READ, -1);
    if (!fd)
    {
       RARCH_LOG("Could not open CUE file '%s': %s\n", cue_path,
@@ -397,12 +396,17 @@ int find_first_data_track(const char *cue_path,
    {
       if (string_is_equal(tmp_token, "FILE"))
       {
+         char cue_dir[PATH_MAX_LENGTH] = {0};
+
+         fill_pathname_basedir(cue_dir, cue_path, sizeof(cue_dir));
+
          get_token(fd, tmp_token, MAX_TOKEN_LEN);
          fill_pathname_join(track_path, cue_dir, tmp_token, max_len);
 
       }
       else if (string_is_equal_noncase(tmp_token, "TRACK"))
       {
+         int m, s, f;
          get_token(fd, tmp_token, MAX_TOKEN_LEN);
          get_token(fd, tmp_token, MAX_TOKEN_LEN);
          if (string_is_equal_noncase(tmp_token, "AUDIO"))
@@ -421,7 +425,8 @@ int find_first_data_track(const char *cue_path,
 
          *offset = ((m * 60) * (s * 75) * f) * 25;
 
-         RARCH_LOG("Found 1st data track on file '%s+%d'\n",
+         RARCH_LOG("%s '%s+%d'\n",
+               msg_hash_to_str(MSG_FOUND_FIRST_DATA_TRACK_ON_FILE),
                track_path, *offset);
 
          rv = 0;

@@ -241,7 +241,8 @@ static dylib_t libretro_get_system_info_lib(const char *path,
 
    if (!lib)
    {
-      RARCH_ERR("Failed to open libretro core: \"%s\"\n",
+      RARCH_ERR("%s: \"%s\"\n",
+            msg_hash_to_str(MSG_FAILED_TO_OPEN_LIBRETRO_CORE),
             path);
       RARCH_ERR("Error(s): %s\n", dylib_error());
       return NULL;
@@ -833,7 +834,7 @@ bool rarch_environment_cb(unsigned cmd, void *data)
       {
          const struct retro_message *msg = (const struct retro_message*)data;
          RARCH_LOG("Environ SET_MESSAGE: %s\n", msg->msg);
-         runloop_msg_queue_push(msg->msg, 1, msg->frames, true);
+         runloop_msg_queue_push(msg->msg, 3, msg->frames, true);
          break;
       }
 
@@ -844,7 +845,8 @@ bool rarch_environment_cb(unsigned cmd, void *data)
          if (!settings->video.allow_rotate)
             break;
 
-         system->rotation = rotation;
+         if (system)
+            system->rotation = rotation;
 
          if (!video_driver_set_rotation(rotation))
             return false;
@@ -858,9 +860,12 @@ bool rarch_environment_cb(unsigned cmd, void *data)
          break;
 
       case RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL:
-         system->performance_level = *(const unsigned*)data;
-         RARCH_LOG("Environ PERFORMANCE_LEVEL: %u.\n",
-               system->performance_level);
+         if (system)
+         {
+            system->performance_level = *(const unsigned*)data;
+            RARCH_LOG("Environ PERFORMANCE_LEVEL: %u.\n",
+                  system->performance_level);
+         }
          break;
 
       case RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY:
@@ -935,99 +940,101 @@ bool rarch_environment_cb(unsigned cmd, void *data)
 
       case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS:
       {
-         unsigned retro_id;
-         const struct retro_input_descriptor *desc = NULL;
-
-         static const char *libretro_btn_desc[] = {
+         static const char *libretro_btn_desc[]    = {
             "B (bottom)", "Y (left)", "Select", "Start",
             "D-Pad Up", "D-Pad Down", "D-Pad Left", "D-Pad Right",
             "A (right)", "X (up)",
             "L", "R", "L2", "R2", "L3", "R3",
          };
 
-         memset(&system->input_desc_btn, 0,
-               sizeof(system->input_desc_btn));
-
-         desc = (const struct retro_input_descriptor*)data;
-
-         for (; desc->description; desc++)
+         if (system)
          {
-            unsigned retro_port = desc->port;
+            unsigned retro_id;
+            const struct retro_input_descriptor *desc = NULL;
+            memset(&system->input_desc_btn, 0,
+                  sizeof(system->input_desc_btn));
 
-            retro_id            = desc->id;
+            desc = (const struct retro_input_descriptor*)data;
 
-            if (desc->port >= MAX_USERS)
-               continue;
-
-            /* Ignore all others for now. */
-            if (desc->device != RETRO_DEVICE_JOYPAD  &&
-                  desc->device != RETRO_DEVICE_ANALOG)
-               continue;
-
-            if (desc->id >= RARCH_FIRST_CUSTOM_BIND)
-               continue;
-
-            if (desc->device == RETRO_DEVICE_ANALOG)
+            for (; desc->description; desc++)
             {
-               switch (retro_id)
-               {
-                  case RETRO_DEVICE_ID_ANALOG_X:
-                     switch (desc->index)
-                     {
-                        case RETRO_DEVICE_INDEX_ANALOG_LEFT:
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_LEFT_X_PLUS]  = desc->description;
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_LEFT_X_MINUS] = desc->description;
-                           break;
-                        case RETRO_DEVICE_INDEX_ANALOG_RIGHT:
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_RIGHT_X_PLUS] = desc->description;
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_RIGHT_X_MINUS] = desc->description;
-                           break;
-                     }
-                     break;
-                  case RETRO_DEVICE_ID_ANALOG_Y:
-                     switch (desc->index)
-                     {
-                        case RETRO_DEVICE_INDEX_ANALOG_LEFT:
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_LEFT_Y_PLUS] = desc->description;
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_LEFT_Y_MINUS] = desc->description;
-                           break;
-                        case RETRO_DEVICE_INDEX_ANALOG_RIGHT:
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_RIGHT_Y_PLUS] = desc->description;
-                           system->input_desc_btn[retro_port]
-                           [RARCH_ANALOG_RIGHT_Y_MINUS] = desc->description;
-                           break;
-                     }
-                     break;
-               }
-            }
-            else
-               system->input_desc_btn[retro_port]
-               [retro_id] = desc->description;
-         }
+               unsigned retro_port = desc->port;
 
-         RARCH_LOG("Environ SET_INPUT_DESCRIPTORS:\n");
-         for (p = 0; p < settings->input.max_users; p++)
-         {
-            for (retro_id = 0; retro_id < RARCH_FIRST_CUSTOM_BIND; retro_id++)
-            {
-               const char *description = system->input_desc_btn[p][retro_id];
+               retro_id            = desc->id;
 
-               if (!description)
+               if (desc->port >= MAX_USERS)
                   continue;
 
-               RARCH_LOG("\tRetroPad, User %u, Button \"%s\" => \"%s\"\n",
-                     p + 1, libretro_btn_desc[retro_id], description);
-            }
-         }
+               /* Ignore all others for now. */
+               if (desc->device != RETRO_DEVICE_JOYPAD  &&
+                     desc->device != RETRO_DEVICE_ANALOG)
+                  continue;
 
-         core_set_input_descriptors();
+               if (desc->id >= RARCH_FIRST_CUSTOM_BIND)
+                  continue;
+
+               if (desc->device == RETRO_DEVICE_ANALOG)
+               {
+                  switch (retro_id)
+                  {
+                     case RETRO_DEVICE_ID_ANALOG_X:
+                        switch (desc->index)
+                        {
+                           case RETRO_DEVICE_INDEX_ANALOG_LEFT:
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_LEFT_X_PLUS]  = desc->description;
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_LEFT_X_MINUS] = desc->description;
+                              break;
+                           case RETRO_DEVICE_INDEX_ANALOG_RIGHT:
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_RIGHT_X_PLUS] = desc->description;
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_RIGHT_X_MINUS] = desc->description;
+                              break;
+                        }
+                        break;
+                     case RETRO_DEVICE_ID_ANALOG_Y:
+                        switch (desc->index)
+                        {
+                           case RETRO_DEVICE_INDEX_ANALOG_LEFT:
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_LEFT_Y_PLUS] = desc->description;
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_LEFT_Y_MINUS] = desc->description;
+                              break;
+                           case RETRO_DEVICE_INDEX_ANALOG_RIGHT:
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_RIGHT_Y_PLUS] = desc->description;
+                              system->input_desc_btn[retro_port]
+                                 [RARCH_ANALOG_RIGHT_Y_MINUS] = desc->description;
+                              break;
+                        }
+                        break;
+                  }
+               }
+               else
+                  system->input_desc_btn[retro_port]
+                     [retro_id] = desc->description;
+            }
+
+            RARCH_LOG("Environ SET_INPUT_DESCRIPTORS:\n");
+            for (p = 0; p < settings->input.max_users; p++)
+            {
+               for (retro_id = 0; retro_id < RARCH_FIRST_CUSTOM_BIND; retro_id++)
+               {
+                  const char *description = system->input_desc_btn[p][retro_id];
+
+                  if (!description)
+                     continue;
+
+                  RARCH_LOG("\tRetroPad, User %u, Button \"%s\" => \"%s\"\n",
+                        p + 1, libretro_btn_desc[retro_id], description);
+               }
+            }
+
+            core_set_input_descriptors();
+         }
 
          break;
       }
@@ -1053,8 +1060,9 @@ bool rarch_environment_cb(unsigned cmd, void *data)
 
       case RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE:
          RARCH_LOG("Environ SET_DISK_CONTROL_INTERFACE.\n");
-         system->disk_control_cb =
-            *(const struct retro_disk_control_callback*)data;
+         if (system)
+            system->disk_control_cb =
+               *(const struct retro_disk_control_callback*)data;
          break;
 
       case RETRO_ENVIRONMENT_SET_HW_RENDER:
@@ -1251,7 +1259,9 @@ bool rarch_environment_cb(unsigned cmd, void *data)
          cb->stop                  = driver_location_stop;
          cb->get_position          = driver_location_get_position;
          cb->set_interval          = driver_location_set_interval;
-         system->location_cb       = *cb;
+
+         if (system)
+            system->location_cb    = *cb;
 
          location_driver_ctl(RARCH_LOCATION_CTL_UNSET_ACTIVE, NULL);
          break;
@@ -1322,16 +1332,19 @@ bool rarch_environment_cb(unsigned cmd, void *data)
             }
          }
 
-         free(system->subsystem.data);
-         system->subsystem.data = (struct retro_subsystem_info*)
-            calloc(i, sizeof(*system->subsystem.data));
+         if (system)
+         {
+            free(system->subsystem.data);
+            system->subsystem.data = (struct retro_subsystem_info*)
+               calloc(i, sizeof(*system->subsystem.data));
 
-         if (!system->subsystem.data)
-            return false;
+            if (!system->subsystem.data)
+               return false;
 
-         memcpy(system->subsystem.data, info,
-               i * sizeof(*system->subsystem.data));
-         system->subsystem.size = i;
+            memcpy(system->subsystem.data, info,
+                  i * sizeof(*system->subsystem.data));
+            system->subsystem.size = i;
+         }
          break;
       }
 
@@ -1351,15 +1364,18 @@ bool rarch_environment_cb(unsigned cmd, void *data)
                      info[i].types[j].id);
          }
 
-         free(system->ports.data);
-         system->ports.data = (struct retro_controller_info*)
-            calloc(i, sizeof(*system->ports.data));
-         if (!system->ports.data)
-            return false;
+         if (system)
+         {
+            free(system->ports.data);
+            system->ports.data = (struct retro_controller_info*)
+               calloc(i, sizeof(*system->ports.data));
+            if (!system->ports.data)
+               return false;
 
-         memcpy(system->ports.data, info,
-               i * sizeof(*system->ports.data));
-         system->ports.size = i;
+            memcpy(system->ports.data, info,
+                  i * sizeof(*system->ports.data));
+            system->ports.size = i;
+         }
          break;
       }
       
@@ -1433,9 +1449,7 @@ bool rarch_environment_cb(unsigned cmd, void *data)
          {
             RARCH_WARN("Environ SET_MEMORY_MAPS, but system pointer not initialized..\n");
          }
-         
-         
-         
+
          break;
       }
 
@@ -1494,7 +1508,16 @@ bool rarch_environment_cb(unsigned cmd, void *data)
             cheevos_set_support_cheevos(state);
          }
 #endif
-      break;
+         break;
+
+      case RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE:
+      {
+         const struct retro_hw_render_context_negotiation_interface *iface =
+            (const struct retro_hw_render_context_negotiation_interface*)data;
+         RARCH_LOG("Environ SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE.\n");
+         video_driver_set_context_negotiation_interface(iface);
+         break;
+      }
 
       /* Default */
       default:
